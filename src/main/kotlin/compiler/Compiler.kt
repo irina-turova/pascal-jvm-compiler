@@ -2,6 +2,7 @@ package compiler
 
 import io.IOProvider
 import lexer.Lexer
+import parser.Parser
 
 object Compiler {
 
@@ -13,7 +14,6 @@ object Compiler {
         }
         val io = IOProvider(args[0])
         val lexer = Lexer(io)
-        for (i in 1..20)
-            println(lexer.nextSymbol())
+        Parser(lexer).parse()
     }
 }

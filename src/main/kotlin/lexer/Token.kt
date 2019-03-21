@@ -3,6 +3,9 @@ package lexer
 open class Token(val type: TokenType) {
     companion object {
         val KEYWORDS = mapOf(
+            "program" to TokenType.PROGRAM,
+            "type" to TokenType.TYPE,
+            "var" to TokenType.VAR,
             "begin" to TokenType.BEGIN,
             "end" to TokenType.END,
             "if" to TokenType.IF,

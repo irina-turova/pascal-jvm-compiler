@@ -36,7 +36,7 @@ class Lexer(private val io: IOProvider) {
             ':' -> {
                 io.takeNextChar()
                 return if (io.nextChar() == '=')
-                    Token(TokenType.ASSIGN_OPERATOR)
+                    Token(TokenType.ASSIGN_OPERATOR).also { io.takeNextChar() }
                 else
                     Token(TokenType.COLON)
             }
@@ -55,22 +55,22 @@ class Lexer(private val io: IOProvider) {
             '<' -> {
                 io.takeNextChar()
                 return when {
-                    io.nextChar() == '=' -> Token(TokenType.LESS_OR_EQUAL_OPERATOR)
-                    io.nextChar() == '>' -> Token(TokenType.NOT_EQUAL_OPERATOR)
+                    io.nextChar() == '=' -> Token(TokenType.LESS_OR_EQUAL_OPERATOR).also { io.takeNextChar() }
+                    io.nextChar() == '>' -> Token(TokenType.NOT_EQUAL_OPERATOR).also { io.takeNextChar() }
                     else -> Token(TokenType.LESS_OPERATOR)
                 }
             }
             '>' -> {
                 io.takeNextChar()
                 return if (io.nextChar() == '=')
-                    Token(TokenType.GREATER_OR_EQUAL_OPERATOR)
+                    Token(TokenType.GREATER_OR_EQUAL_OPERATOR).also { io.takeNextChar() }
                 else
                     Token(TokenType.GREATER_OPERATOR)
             }
             '.' -> {
                 io.takeNextChar()
                 return if (io.nextChar() == '.')
-                    Token(TokenType.DOT_DOT)
+                    Token(TokenType.DOT_DOT).also { io.takeNextChar() }
                 else
                     Token(TokenType.DOT)
             }
@@ -85,7 +85,7 @@ class Lexer(private val io: IOProvider) {
             '*' -> {
                 io.takeNextChar()
                 return if (io.nextChar() == ')')
-                    Token(TokenType.START_COMMENT_STAR)
+                    Token(TokenType.START_COMMENT_STAR).also { io.takeNextChar() }
                 else
                     Token(TokenType.STAR)
             }
@@ -100,7 +100,7 @@ class Lexer(private val io: IOProvider) {
             '(' -> {
                 io.takeNextChar()
                 return if (io.nextChar() == '*')
-                    Token(TokenType.END_COMMENT_STAR)
+                    Token(TokenType.END_COMMENT_STAR).also { io.takeNextChar() }
                 else
                     Token(TokenType.LEFT_BRACKET)
             }

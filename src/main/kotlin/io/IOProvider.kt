@@ -17,7 +17,7 @@ class IOProvider(fileName: String) {
         while (currentPosition.charNumber > currentLine.length) {
             listCurrentLine()
             if (reader.ready())
-                currentLine = reader.readLine()
+                currentLine = reader.readLine() + " "
             else return false
             currentPosition.lineNumber++
             currentPosition.charNumber = 1

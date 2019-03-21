@@ -24,14 +24,23 @@ enum class TokenType {
     GREATER_OPERATOR,
     GREATER_OR_EQUAL_OPERATOR,
 
+    NOT,
+    OR,
+    AND,
+
     PLUS,
     MINUS,
+
+    DIV,
+    MOD,
 
     STAR,
     SLASH,
     CARET,
 
     PROGRAM,
+    TYPE,
+    VAR,
     BEGIN,
     END,
     IF,
@@ -52,5 +61,5 @@ enum class TokenType {
     LEFT_SQUARE_BRACKET,
     RIGHT_SQUARE_BRACKET,
 
-    THIS_IS_THE_END
+    THIS_IS_THE_END,
 }
