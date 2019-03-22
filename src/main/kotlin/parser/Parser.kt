@@ -4,6 +4,7 @@ import lexer.*
 import java.lang.Exception
 import common.ErrorList
 import common.ErrorCode
+import common.Error
 
 class Parser(val lexer: Lexer, val errors: ErrorList) {
 
@@ -18,7 +19,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
     }
     
     private fun pushError(code: ErrorCode) {
-        pushError(code)
+        errors.pushError(Error(lexer.tokenPosition, code))
     }
 
     fun parse() {
