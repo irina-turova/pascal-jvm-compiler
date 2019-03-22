@@ -1,5 +1,7 @@
 package lexer
 
+import java.lang.Error
+
 enum class TokenType {
     NOTHING,
 
@@ -48,8 +50,12 @@ enum class TokenType {
     ELSE,
     DO,
     FOR,
+    TO,
+    DOWN_TO,
     IN,
     WHILE,
+    REPEAT,
+    UNTIL,
 
     START_COMMENT_STAR,
     END_COMMENT_STAR,
@@ -62,4 +68,8 @@ enum class TokenType {
     RIGHT_SQUARE_BRACKET,
 
     THIS_IS_THE_END,
+
+    PROCEDURE,
+
+    FUNCTION
 }

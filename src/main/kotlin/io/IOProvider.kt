@@ -2,8 +2,9 @@ package io
 
 import java.io.File
 import java.lang.Exception
+import common.ErrorList
 
-class IOProvider(fileName: String) {
+class IOProvider(fileName: String, val errors: ErrorList) {
 
     private val reader = File(fileName).also {
         if (!it.exists())
@@ -38,7 +39,12 @@ class IOProvider(fileName: String) {
     }
 
     private fun listCurrentLine() {
-        println("Listing: $currentLine")
+        println("  ${currentPosition.lineNumber}   $currentLine")
+        var error = errors.peekError()
+        while (error != null) {
+            println("**NO** " + " ".repeat(error.textPosition.charNumber) + " ошибка: ${error.errorCode.errorText()}")
+            error = errors.peekError()
+        }
     }
 
 }

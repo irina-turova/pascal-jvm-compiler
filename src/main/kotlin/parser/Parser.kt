@@ -1,12 +1,11 @@
 package parser
 
-import lexer.Lexer
-import lexer.Token
-import lexer.TokenType
+import lexer.*
 import java.lang.Exception
-import kotlin.reflect.KFunction1
+import common.ErrorList
+import common.ErrorCode
 
-class Parser(val lexer: Lexer) {
+class Parser(val lexer: Lexer, val errors: ErrorList) {
 
     private var currentToken: Token
 
@@ -14,30 +13,49 @@ class Parser(val lexer: Lexer) {
         currentToken = getNextSymbol()
     }
 
-    fun getNextSymbol(): Token {
+    private fun getNextSymbol(): Token {
         return lexer.nextSymbol()
+    }
+    
+    private fun pushError(code: ErrorCode) {
+        pushError(code)
     }
 
     fun parse() {
         program()
     }
 
-    fun accept(expectedToken: TokenType) {
+    private fun accept(expectedToken: TokenType) {
         if (expectedToken == currentToken.type)
             currentToken = getNextSymbol()
         else
-            throw Exception("Expected $expectedToken got ${currentToken.type}")
+            pushError(ErrorCode.fromExpectedToken(expectedToken))
     }
 
     /**
      * <program> ::= program <identifier> ; <block> .
      */
     private fun program() {
-        accept(TokenType.PROGRAM)
-        accept(TokenType.IDENTIFIER)
+        program_heading()
         accept(TokenType.SEMICOLON)
         block()
         accept(TokenType.DOT)
+    }
+
+    private fun program_heading() {
+        accept(TokenType.PROGRAM)
+        accept(TokenType.IDENTIFIER)
+        if (currentToken.type == TokenType.LEFT_BRACKET) {
+            identifier_list()
+        }
+    }
+
+    private fun identifier_list() {
+        accept(TokenType.IDENTIFIER)
+        while (currentToken.type == TokenType.COMMA) {
+            accept(TokenType.COMMA)
+            accept(TokenType.IDENTIFIER)
+        }
     }
 
     /**
@@ -47,7 +65,113 @@ class Parser(val lexer: Lexer) {
     private fun block() {
         type_definition_part()
         variable_declaration_part()
+        procedure_and_function_declaration_part()
         statement_part()
+    }
+
+    /**
+     * <procedure and function declaration part> ::= {<procedure or function declaration > ;}
+     */
+    private fun procedure_and_function_declaration_part() {
+        while (currentToken.type == TokenType.PROCEDURE || currentToken.type == TokenType.FUNCTION) {
+            procedure_or_function_declaration()
+            accept(TokenType.SEMICOLON)
+        }
+    }
+
+    /**
+     * <procedure or function declaration > ::= <procedure declaration> | <function declaration >
+     */
+    private fun procedure_or_function_declaration() {
+        if (currentToken.type == TokenType.PROCEDURE) procedure_declaration()
+        else if (currentToken.type == TokenType.FUNCTION) function_declaration()
+    }
+
+    /**
+     * <procedure declaration> ::= <procedure heading> <block>
+     *     // в описании стандарта более сложно
+     */
+    private fun procedure_declaration() {
+        procedure_heading()
+        block()
+    }
+
+    /**
+     * <procedure heading> ::= procedure <identifier> ; |
+     */
+    private fun procedure_heading() {
+        accept(TokenType.PROCEDURE)
+        accept(TokenType.IDENTIFIER)
+
+        if (currentToken.type == TokenType.LEFT_BRACKET)
+            function_parameter_list()
+    }
+
+    /**
+     * formal-parameter-list = `(' formal-parameter-section { ` ;' formal-parameter-section ~ `)' .
+     */
+    private fun function_parameter_list() {
+        accept(TokenType.LEFT_BRACKET)
+        formal_parameters_section()
+        while (currentToken.type == TokenType.SEMICOLON) {
+            accept(TokenType.SEMICOLON)
+            formal_parameters_section()
+        }
+    }
+
+    private fun function_declaration() {
+        function_heading()
+        block()
+    }
+
+    private fun function_heading() {
+        accept(TokenType.FUNCTION)
+        accept(TokenType.IDENTIFIER)
+
+        if (currentToken.type == TokenType.LEFT_BRACKET)
+            function_parameter_list()
+    }
+
+    /**
+     * <formal parameter section> ::= <parameter group> | var <parameter group>
+     *     | function <parameter group> | procedure <identifier> { , <identifier>}
+     */
+    private fun formal_parameters_section() {
+        when(currentToken.type) {
+            TokenType.IDENTIFIER -> value_parameter_section()
+            TokenType.VAR -> variable_parameter_section()
+            TokenType.FUNCTION -> function_heading()
+            TokenType.PROCEDURE -> procedure_heading()
+            else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
+        }
+    }
+
+    /**
+     * variable-parameter-section = var identifier-list ":" parameter-type
+     */
+    private fun variable_parameter_section() {
+        accept(TokenType.VAR)
+        parameter_group()
+    }
+
+    /**
+     * value-parameter-section = identifier-list ":" parameter-type
+     */
+    private fun value_parameter_section() {
+        parameter_group()
+    }
+
+    /**
+     * <parameter group> ::= <identifier> {, <identifier>} : <type identifier>
+     */
+    private fun parameter_group() {
+        accept(TokenType.IDENTIFIER)
+        while (currentToken.type == TokenType.COMMA) {
+            accept(TokenType.COMMA)
+            accept(TokenType.IDENTIFIER)
+        }
+        accept(TokenType.COLON)
+        type_identifier()
     }
 
     /**
@@ -112,26 +236,10 @@ class Parser(val lexer: Lexer) {
      * <simple type> ::= <scalar type> | <subrange type> | <type identifier>
      */
     private fun simple_type() {
-        when {
-            currentToken.type == TokenType.LEFT_BRACKET -> scalar_type()
-            currentToken.type == TokenType.IDENTIFIER -> type_identifier()
-            else -> throw Exception("ERROR")
-        }
-    }
-
-    /**
-     * <scalar type> ::= (<identifier> {,<identifier>})
-     */
-    private fun scalar_type() {
-        accept(TokenType.LEFT_BRACKET)
-        accept(TokenType.IDENTIFIER)
-
-        while (currentToken.type == TokenType.COMMA) {
-            accept(TokenType.COMMA)
-            accept(TokenType.IDENTIFIER)
-        }
-
-        accept(TokenType.RIGHT_BRACKET)
+        if (currentToken.type == TokenType.IDENTIFIER)
+            type_identifier()
+        else
+            pushError(ErrorCode.TYPE_IDENTIFIER_EXPECTED)
     }
 
     /**
@@ -177,7 +285,7 @@ class Parser(val lexer: Lexer) {
         when {
             currentToken.type == TokenType.IDENTIFIER -> simple_statement()
             currentToken.type in setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE) -> structured_statement()
-            else -> throw Exception("ERROR")
+            else -> pushError(ErrorCode.IDENTIFIER_EXPECTED) // ?
         }
     }
 
@@ -206,7 +314,7 @@ class Parser(val lexer: Lexer) {
             currentToken.type == TokenType.BEGIN -> compound_statement()
             currentToken.type == TokenType.IF -> conditional_statement()
             currentToken.type == TokenType.WHILE -> repetitive_statement()
-            else -> throw Exception("ERROR")
+            else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE")
         }
     }
 
@@ -268,7 +376,7 @@ class Parser(val lexer: Lexer) {
                 accept(opToken)
                 return
             }
-        throw Exception("ERROR")
+        throw Exception("Unexpected error - here MUST be one of +, -, or")
     }
 
     /**
@@ -278,7 +386,7 @@ class Parser(val lexer: Lexer) {
         when {
             currentToken.type == TokenType.PLUS -> accept(TokenType.PLUS)
             currentToken.type == TokenType.MINUS -> accept(TokenType.MINUS)
-            else -> throw Exception("ERROR")
+            else -> throw Exception("Unexpected error - here MUST be one of +, -")
         }
     }
 
@@ -309,7 +417,7 @@ class Parser(val lexer: Lexer) {
                 accept(TokenType.NOT)
                 factor()
             }
-            else -> throw Exception("ERROR")
+            else -> pushError(ErrorCode.VARIABLE_IDENTIFIER_EXPECTED) // ?
         }
     }
 
@@ -328,7 +436,7 @@ class Parser(val lexer: Lexer) {
             currentToken.type == TokenType.INT_CONSTANT -> accept(TokenType.INT_CONSTANT)
             currentToken.type == TokenType.DOUBLE_CONSTANT -> accept(TokenType.DOUBLE_CONSTANT)
             currentToken.type == TokenType.STRING_CONSTANT -> accept(TokenType.STRING_CONSTANT)
-            else -> throw Exception("ERROR")
+            else -> pushError(ErrorCode.CONSTANT_EXPECTED)
         }
     }
 
@@ -343,7 +451,7 @@ class Parser(val lexer: Lexer) {
                 accept(opToken)
                 return
             }
-        throw Exception("ERROR")
+        throw Exception("Unexpected error - here MUST be one of *, /, div, mod, and")
     }
 
     /**
@@ -357,7 +465,7 @@ class Parser(val lexer: Lexer) {
                 accept(opToken)
                 return
             }
-        throw Exception("ERROR")
+        throw Exception("Unexpected error - here MUST be one of =, <>, <, <=, >=, >, in")
     }
 
     /**

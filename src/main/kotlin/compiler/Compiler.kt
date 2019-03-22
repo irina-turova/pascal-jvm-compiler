@@ -3,6 +3,7 @@ package compiler
 import io.IOProvider
 import lexer.Lexer
 import parser.Parser
+import common.ErrorList
 
 object Compiler {
 
@@ -12,8 +13,9 @@ object Compiler {
             println("Specify program file name as the first parameter.")
             return
         }
-        val io = IOProvider(args[0])
-        val lexer = Lexer(io)
-        Parser(lexer).parse()
+        val errorList = ErrorList()
+        val io = IOProvider(args[0], errorList)
+        val lexer = Lexer(io, errorList)
+        Parser(lexer, errorList).parse()
     }
 }

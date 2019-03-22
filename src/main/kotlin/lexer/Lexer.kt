@@ -2,8 +2,11 @@ package lexer
 
 import io.IOProvider
 import io.TextPosition
+import common.ErrorList
+import common.Error
+import common.ErrorCode
 
-class Lexer(private val io: IOProvider) {
+class Lexer(private val io: IOProvider, val errors: ErrorList) {
 
     lateinit var tokenPosition: TextPosition
 
@@ -130,6 +133,7 @@ class Lexer(private val io: IOProvider) {
             }
             else -> {
                 io.takeNextChar()
+                errors.pushError(Error(tokenPosition, ErrorCode.NO_NAME_ERROR))
                 return Token(TokenType.NOTHING)
             }
         }
