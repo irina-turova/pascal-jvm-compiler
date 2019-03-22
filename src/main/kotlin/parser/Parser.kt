@@ -120,17 +120,27 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
         }
     }
 
+    /**
+     * function-declaration = function-heading ` ;' directive | function-identification ` ;' function-block
+     *      | function-heading ` ;' function-block .
+     */
     private fun function_declaration() {
         function_heading()
         block()
     }
 
+    /**
+     * function-heading = `function' identifier [ formal-parameter-list ] ':' result-type .
+     */
     private fun function_heading() {
         accept(TokenType.FUNCTION)
         accept(TokenType.IDENTIFIER)
 
         if (currentToken.type == TokenType.LEFT_BRACKET)
             function_parameter_list()
+
+        accept(TokenType.COLON)
+        type_identifier()
     }
 
     /**
