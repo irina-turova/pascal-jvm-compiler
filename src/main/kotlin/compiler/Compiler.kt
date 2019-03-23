@@ -4,6 +4,7 @@ import io.IOProvider
 import lexer.Lexer
 import parser.Parser
 import common.ErrorList
+import semantic.ScopeManager
 
 object Compiler {
 
@@ -16,6 +17,12 @@ object Compiler {
         val errorList = ErrorList()
         val io = IOProvider(args[0], errorList)
         val lexer = Lexer(io, errorList)
-        Parser(lexer, errorList).parse()
+        Parser(lexer, errorList, ScopeManager()).parse()
+
+        var error = errorList.peekError()
+        while (error != null) {
+            println("**NO** " + " ".repeat(error.textPosition.charNumber) + " ошибка: ${error.errorCode.errorText()}")
+            error = errorList.peekError()
+        }
     }
 }

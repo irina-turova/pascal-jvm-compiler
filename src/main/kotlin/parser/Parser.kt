@@ -1,12 +1,18 @@
 package parser
 
-import lexer.*
+import lexer.TokenType
+import lexer.Token
+import lexer.Lexer
 import java.lang.Exception
 import common.ErrorList
 import common.ErrorCode
 import common.Error
+import lexer.IdentifierToken
+import semantic.ScopeManager
+import semantic.types.Type
+import semantic.identifiers.*
 
-class Parser(val lexer: Lexer, val errors: ErrorList) {
+class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeManager) {
 
     private var currentToken: Token
 
@@ -37,24 +43,40 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
      * <program> ::= program <identifier> ; <block> .
      */
     private fun program() {
+
+        // The main scope for the program
+        scopeManager.openScope()
+
         program_heading()
         accept(TokenType.SEMICOLON)
         block()
         accept(TokenType.DOT)
+
+        scopeManager.closeScope()
     }
 
+    /**
+     * program-heading = `program' identifier [ `(' program-parameter-list `)' ]
+     */
     private fun program_heading() {
         accept(TokenType.PROGRAM)
+        val token = currentToken
+        if (token is IdentifierToken)
+            scopeManager.addIdentifier(ProgramIdentifier(token.identifier, ScopeManager.programType))
         accept(TokenType.IDENTIFIER)
         if (currentToken.type == TokenType.LEFT_BRACKET) {
+            accept(TokenType.LEFT_BRACKET)
             identifier_list()
+            accept(TokenType.RIGHT_BRACKET)
         }
     }
 
-    private fun identifier_list() {
+    private fun identifier_list() { // TODO: identifier list for procedures and other usages
+        scopeManager.addVariableToBuffer(currentToken)
         accept(TokenType.IDENTIFIER)
         while (currentToken.type == TokenType.COMMA) {
             accept(TokenType.COMMA)
+            scopeManager.addVariableToBuffer(currentToken)
             accept(TokenType.IDENTIFIER)
         }
     }
@@ -93,8 +115,13 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
      *     // в описании стандарта более сложно
      */
     private fun procedure_declaration() {
+
+        scopeManager.openScope()
+
         procedure_heading()
         block()
+
+        scopeManager.closeScope()
     }
 
     /**
@@ -125,8 +152,13 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
      *      | function-heading ` ;' function-block .
      */
     private fun function_declaration() {
+
+        scopeManager.openScope()
+
         function_heading()
         block()
+
+        scopeManager.closeScope()
     }
 
     /**
@@ -190,6 +222,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
      */
     private fun type_definition_part() {
         if (currentToken.type == TokenType.TYPE) {
+            accept(TokenType.TYPE)
             type_definition()
             accept(TokenType.SEMICOLON)
             while (currentToken.type == TokenType.IDENTIFIER) {
@@ -203,9 +236,16 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
      * <type definition> ::= <identifier> = <type>
      */
     private fun type_definition() {
+        val token = currentToken
+        val identifier = if (token is IdentifierToken) TypeIdentifier(token.identifier)
+            else null
+        if (identifier != null && scopeManager.addIdentifier(identifier) != null)
+            pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+
         accept(TokenType.IDENTIFIER)
         accept(TokenType.EQUAL_OPERATOR)
-        type()
+        val typedef = type()
+        identifier?.type = typedef
     }
 
     /**
@@ -227,37 +267,42 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
      * <variable declaration> ::= <identifier> {,<identifier>} : <type>
      */
     private fun variable_declaration() {
-        accept(TokenType.IDENTIFIER)
-        while (currentToken.type == TokenType.COMMA) {
-            accept(TokenType.COMMA)
-            accept(TokenType.IDENTIFIER)
-        }
+        identifier_list()
         accept(TokenType.COLON)
-        type()
+        val variableType = type()
+        scopeManager.flushVariableBuffer(variableType)
     }
 
     /**
      * <type> ::= <simple type> | <structured type> | <pointer type>
      */
-    private fun type() {
-        simple_type()
+    private fun type(): Type? {
+        return simple_type()
     }
 
     /**
      * <simple type> ::= <scalar type> | <subrange type> | <type identifier>
      */
-    private fun simple_type() {
+    private fun simple_type(): Type? {
         if (currentToken.type == TokenType.IDENTIFIER)
-            type_identifier()
-        else
+            return type_identifier()
+        else {
             pushError(ErrorCode.TYPE_IDENTIFIER_EXPECTED)
+            return null
+        }
     }
 
     /**
      * <type identifier> ::= <identifier>
      */
-    private fun type_identifier() {
+    private fun type_identifier(): Type? {
+        val identifier = scopeManager.findIdentifier(currentToken)
         accept(TokenType.IDENTIFIER)
+        if (identifier == null || identifier !is TypeIdentifier) {
+            pushError(ErrorCode.TYPE_IDENTIFIER_EXPECTED)
+            return null
+        } else
+            return identifier.type
     }
 
     /**
@@ -341,7 +386,9 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
      */
     private fun if_statement() {
         accept(TokenType.IF)
-        expression()
+        val expressionType = expression()
+        if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
+            pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
         accept(TokenType.THEN)
         statement()
         if (currentToken.type == TokenType.ELSE) {
@@ -353,28 +400,48 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
     /**
      * <expression> ::= <simple expression> | <simple expression> <relational operator> <simple expression>
      */
-    private fun expression() {
-        simple_expression()
+    private fun expression(): Type? {
+        var resultType = simple_expression()
         if (currentToken.type in relationalOperators) {
+            val operator = currentToken.type
             relational_operator()
-            simple_expression()
+            val expType = simple_expression()
+            resultType = if (resultType != null && expType != null)
+                resultType.comparingType(expType, operator)
+                    .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
+            else null
         }
+        return resultType
     }
 
     /**
      * <simple expression> ::= <term> | <sign> <term>| <simple expression> <adding operator> <term>
      */
-    private fun simple_expression() {
+    private fun simple_expression(): Type? {
+
+        var resultType: Type?
+
         if (currentToken.type in setOf(TokenType.PLUS, TokenType.MINUS)) {
             sign()
-            term()
+            resultType = term()
+            if (resultType != null && !resultType.isSignable())
+                pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
         } else if (currentToken.type in setOf(TokenType.IDENTIFIER, TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT,
                 TokenType.LEFT_BRACKET, TokenType.NOT))
-            term()
+            resultType = term()
+        else
+            resultType = null
         while (currentToken.type in setOf(TokenType.PLUS, TokenType.MINUS, TokenType.OR)) {
+            val operator = currentToken.type
             adding_operator()
-            simple_expression()
+            val termType = term()
+            resultType = if (resultType != null && termType != null)
+                resultType.addingType(termType, operator)
+                    .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
+            else null
         }
+
+        return resultType
     }
 
     /**
@@ -404,51 +471,122 @@ class Parser(val lexer: Lexer, val errors: ErrorList) {
     /**
      * <term> ::= <factor> | <term> <multiplying operator> <factor>
      */
-    private fun term() {
-        factor()
+    private fun term(): Type? {
+        var resultType = factor()
         while (currentToken.type in multiplyingOperators) {
+            val operator = currentToken.type
             multiplying_operator()
-            factor()
+            val factorType = factor()
+            resultType = if (resultType != null && factorType != null)
+                resultType.multiplyingType(factorType, operator)
+                    .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
+            else null
         }
+        return resultType
     }
 
     /**
      * <factor> ::= <variable> | <unsigned constant> | ( <expression> ) | <function designator> | <set> | not <factor>
      */
-    private fun factor() {
+    private fun factor(): Type? {
+        val resultType: Type?
+
         when {
-            currentToken.type == TokenType.IDENTIFIER -> variable()
-            currentToken.type in setOf(TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.STRING_CONSTANT) -> unsingned_constant()
+            currentToken.type == TokenType.IDENTIFIER -> {
+                val identifier = scopeManager.findIdentifier(currentToken)
+                when (identifier) {
+                    is VariableIdentifier -> resultType = variable()
+                    is ConstantIdentifier -> {resultType = identifier.type; currentToken = getNextSymbol()}
+                    is FunctionIdentifier -> resultType = function_designator()
+                    null -> resultType = null // TODO: Standard functions or error
+                    else -> resultType = null // TODO: тоже какая-то ошибка, например, если это процедура или тип...
+                }
+            }
+            currentToken.type in setOf(TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT) -> resultType = unsingned_constant()
             currentToken.type == TokenType.LEFT_BRACKET -> {
                 accept(TokenType.LEFT_BRACKET)
-                expression()
+                resultType = expression()
                 accept(TokenType.RIGHT_BRACKET)
             }
             currentToken.type == TokenType.NOT -> {
                 accept(TokenType.NOT)
-                factor()
+                resultType = factor()
+                if (resultType != null && !resultType.isLogical())
+                    pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
             }
-            else -> pushError(ErrorCode.VARIABLE_IDENTIFIER_EXPECTED) // ?
+            else -> {
+                pushError(ErrorCode.VARIABLE_IDENTIFIER_EXPECTED) // ?
+                resultType = null
+            }
         }
+
+        return resultType
+    }
+
+    /**
+     * function-designator = function-identifier [ actual-parameter-list ] .
+     */
+    private fun function_designator(): Type? {
+        val resultType = scopeManager.findIdentifier(currentToken)?.let { if (it is FunctionIdentifier) it.resultType else null }
+        accept(TokenType.IDENTIFIER)
+        if (currentToken.type == TokenType.LEFT_BRACKET)
+            actual_parameter_list() // TODO: check parameters list types
+        return resultType
+    }
+
+    /**
+     * actual-parameter-list = `(' actual-parameter f `,' actual-parameter g `)' .
+     */
+    private fun actual_parameter_list() {
+        accept(TokenType.LEFT_BRACKET)
+        actual_parameter()
+        while (currentToken.type == TokenType.COMMA) {
+            accept(TokenType.COMMA)
+            actual_parameter()
+        }
+    }
+
+    /**
+     * actual-parameter = expression | variable-access | procedure-identifier | function-identifier .
+     */
+    private fun actual_parameter() {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
     /**
      * <variable> ::= <entire variable> | <component variable> | <referenced variable>
      */
-    private fun variable() {
+    private fun variable(): Type? {
+        val identifier = scopeManager.findIdentifier(currentToken)
         accept(TokenType.IDENTIFIER)
+        return identifier?.type
     }
 
     /**
      * <unsigned constant> ::= <unsigned number> | <string> | < constant identifier> < nil>
      */
-    private fun unsingned_constant() {
+    private fun unsingned_constant(): Type? {
+
+        val resultType: Type?
         when {
-            currentToken.type == TokenType.INT_CONSTANT -> accept(TokenType.INT_CONSTANT)
-            currentToken.type == TokenType.DOUBLE_CONSTANT -> accept(TokenType.DOUBLE_CONSTANT)
-            currentToken.type == TokenType.STRING_CONSTANT -> accept(TokenType.STRING_CONSTANT)
-            else -> pushError(ErrorCode.CONSTANT_EXPECTED)
+            currentToken.type == TokenType.INT_CONSTANT -> {
+                accept(TokenType.INT_CONSTANT)
+                resultType = ScopeManager.integerType
+            }
+            currentToken.type == TokenType.DOUBLE_CONSTANT -> {
+                accept(TokenType.DOUBLE_CONSTANT)
+                resultType = ScopeManager.realType
+            }
+            currentToken.type == TokenType.CHAR_CONSTANT -> {
+                accept(TokenType.CHAR_CONSTANT)
+                resultType = ScopeManager.charType
+            }
+            else -> {
+                pushError(ErrorCode.CONSTANT_EXPECTED)
+                resultType = null
+            }
         }
+        return resultType
     }
 
     /**

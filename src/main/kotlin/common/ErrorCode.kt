@@ -6,11 +6,14 @@ enum class ErrorCode(val code: Int) {
     ERROR(34),
 
     IDENTIFIER_EXPECTED(2),
+    DUPLICATE_IDENTIFIER(4),
     TYPE_IDENTIFIER_EXPECTED(12),
     VARIABLE_IDENTIFIER_EXPECTED(20),
     CONSTANT_EXPECTED(31),
     BEGIN_EXPECTED(36),
     END_EXPECTED(37),
+    BOOLEAN_EXPRESSION_EXPECTED(40),
+    OPERAND_TYPES_DO_NOT_MATCH_OPERATOR(41),
     DO_EXPECTED(50),
     THEN_EXPECTED(57),
     SEMICOLON_EXPECTED(85),
@@ -34,7 +37,7 @@ enum class ErrorCode(val code: Int) {
 
     private val codesToMessage = mapOf(
         1 to "Out of memory - Выход за границы памяти",
-        2 to "Identifier expected - He указан идентификатор",
+        2 to "semantic.identifiers.Identifier expected - He указан идентификатор",
         3 to "Unknown identifier - Неизвестный идентификатор",
         4 to "Duplicate identifier - Двойной идентификатор",
         5 to "Syntax error - Синтаксическая ошибка",
