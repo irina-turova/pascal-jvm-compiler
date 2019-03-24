@@ -9,8 +9,8 @@ enum class TokenType {
 
     INT_CONSTANT,
     DOUBLE_CONSTANT,
-    STRING_CONSTANT, // TODO: we do not support strings
-    CHAR_CONSTANT, // TODO: support char constant in lexer
+    // STRING_CONSTANT,
+    CHAR_CONSTANT,
 
     COMMA,
     COLON,

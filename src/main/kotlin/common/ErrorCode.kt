@@ -25,6 +25,7 @@ enum class ErrorCode(val code: Int) {
     ASSIGN_OPERATOR_EXPECTED(91),
     DOT_EXPECTED(94),
     DOT_DOT_EXPECTED(95),
+    CHARACTER_EXPRESSION_EXPECTED(106),
 
     NO_NAME_ERROR(152),
     UNEXPECTED_SYMBOL(-1),
@@ -38,7 +39,7 @@ enum class ErrorCode(val code: Int) {
     private val codesToMessage = mapOf(
         -1 to "Unexpected symbol - Неожиданный символ",
         1 to "Out of memory - Выход за границы памяти",
-        2 to "semantic.identifiers.Identifier expected - He указан идентификатор",
+        2 to "Identifier expected - He указан идентификатор",
         3 to "Unknown identifier - Неизвестный идентификатор",
         4 to "Duplicate identifier - Двойной идентификатор",
         5 to "Syntax error - Синтаксическая ошибка",
@@ -149,7 +150,7 @@ enum class ErrorCode(val code: Int) {
         110 to "Debug information table overflow - Переполнение информационной таблицы отладки",
         111 to "- - -",
         112 to "CASE constant out of range - Константа CASE нарушает допустимые границы",
-        113 to "common.Error in statement - Ошибка в операторе",
+        113 to "Error in statement - Ошибка в операторе",
         114 to "Cannot call an interrupt procedure - Невозможно вызвать процедуру прерывания",
         115 to "- - -",
         116 to "Must be in 8087 mode to compile this - Для компиляции необходим режим 8087",

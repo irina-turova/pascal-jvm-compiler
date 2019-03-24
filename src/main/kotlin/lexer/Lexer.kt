@@ -24,17 +24,22 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
                         KeywordToken(it, tokenPosition)
                 }
             }
-            in '0'..'9' -> {
+            in '0'..'9' -> { // TODO: full number constants support
                 var number = io.takeNextChar().toString()
                 while (io.nextChar().isDigit())
                     number += (io.takeNextChar())
                 ConstantToken(TokenType.INT_CONSTANT, tokenPosition, number)
             }
             '\'' -> {
-                var string = io.takeNextChar().toString()
-                while (io.nextChar() != '\'')
-                    string += (io.takeNextChar())
-                ConstantToken(TokenType.STRING_CONSTANT, tokenPosition, string)
+                io.takeNextChar()
+                val char = io.takeNextChar()
+                if (io.nextChar() != '\'') {
+                    errors.pushError(Error(tokenPosition, ErrorCode.CHARACTER_EXPRESSION_EXPECTED))
+                    Token(TokenType.NOTHING, tokenPosition)
+                } else {
+                    io.takeNextChar()
+                    ConstantToken(TokenType.CHAR_CONSTANT, tokenPosition, char)
+                }
             }
             ':' -> {
                 io.takeNextChar()

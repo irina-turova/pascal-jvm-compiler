@@ -490,7 +490,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             resultType = term()
             if (resultType != null && !resultType.isSignable())
                 pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
-        } else if (currentToken.type in setOf(TokenType.IDENTIFIER, TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT,
+        } else if (currentToken.type in setOf(TokenType.IDENTIFIER, TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT,
                 TokenType.LEFT_BRACKET, TokenType.NOT))
             resultType = term()
         else
