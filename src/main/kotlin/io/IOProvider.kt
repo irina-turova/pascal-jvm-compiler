@@ -39,10 +39,10 @@ class IOProvider(fileName: String, val errors: ErrorList) {
     }
 
     private fun listCurrentLine() {
-        println("  ${currentPosition.lineNumber}   $currentLine")
+        println("  ${currentPosition.lineNumber.toString().padStart(2)}   $currentLine")
         var error = errors.peekError()
         while (error != null) {
-            println("**NO** " + " ".repeat(error.textPosition.charNumber) + " ошибка: ${error.errorCode.errorText()}")
+            println("**NO** " + " ".repeat(error.textPosition.charNumber - 1) + "^ ошибка: ${error.errorCode.errorText()}")
             error = errors.peekError()
         }
     }

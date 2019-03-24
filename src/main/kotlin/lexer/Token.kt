@@ -1,6 +1,8 @@
 package lexer
 
-open class Token(val type: TokenType) {
+import io.TextPosition
+
+open class Token(val type: TokenType, val position: TextPosition) {
     companion object {
         val KEYWORDS = mapOf(
             "program" to TokenType.PROGRAM,
@@ -14,7 +16,10 @@ open class Token(val type: TokenType) {
             "do" to TokenType.DO,
             "for" to TokenType.FOR,
             "in" to TokenType.IN,
-            "while" to TokenType.WHILE
+            "while" to TokenType.WHILE,
+            "not" to TokenType.NOT,
+            "or" to TokenType.OR,
+            "and" to TokenType.AND
         )
     }
 
@@ -23,12 +28,12 @@ open class Token(val type: TokenType) {
     }
 }
 
-class KeywordToken(type: TokenType): Token(type)
+class KeywordToken(type: TokenType, position: TextPosition): Token(type, position)
 
-class IdentifierToken(type: TokenType, val identifier: String): Token(type) {
+class IdentifierToken(type: TokenType, position: TextPosition, val identifier: String): Token(type, position) {
     override fun toString(): String {
         return super.toString() + " " + identifier
     }
 }
 
-class ConstantToken(type: TokenType, val value: Any): Token(type)
+class ConstantToken(type: TokenType, position: TextPosition, val value: Any): Token(type, position)

@@ -25,11 +25,33 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
     
     private fun pushError(code: ErrorCode) {
-        errors.pushError(Error(lexer.tokenPosition, code))
+        errors.pushError(Error(currentToken.position, code))
+    }
+
+    private fun skipTo(vararg tokens: Set<TokenType>) {
+        val united = tokens.fold(setOf(TokenType.THIS_IS_THE_END)) { a, b -> a union b}
+        while (currentToken.type !in united) {
+            println("Skipping $currentToken")
+            currentToken = getNextSymbol()
+        }
+    }
+
+    private fun checkBeg(starters: Set<TokenType>, followers: Set<TokenType>) {
+        if (currentToken.type !in (starters union followers)) {
+            pushError(ErrorCode.UNEXPECTED_SYMBOL)
+            skipTo(starters, followers)
+        }
+    }
+
+    private fun checkEnd(followers: Set<TokenType>) {
+        if (currentToken.type !in followers) {
+            pushError(ErrorCode.UNEXPECTED_SYMBOL)
+            skipTo(followers)
+        }
     }
 
     fun parse() {
-        program()
+        program(setOf(TokenType.THIS_IS_THE_END))
     }
 
     private fun accept(expectedToken: TokenType) {
@@ -42,35 +64,49 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <program> ::= program <identifier> ; <block> .
      */
-    private fun program() {
+    private fun program(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.PROGRAM)
+        checkBeg(starters, followers)
 
         // The main scope for the program
         scopeManager.openScope()
 
-        program_heading()
-        accept(TokenType.SEMICOLON)
-        block()
-        accept(TokenType.DOT)
+        if (currentToken.type in starters) {
+            program_heading(followers union block_starters )
+            block(followers union setOf(TokenType.DOT))
+            accept(TokenType.DOT)
 
+            checkEnd(followers)
+        }
         scopeManager.closeScope()
     }
 
     /**
      * program-heading = `program' identifier [ `(' program-parameter-list `)' ]
      */
-    private fun program_heading() {
-        accept(TokenType.PROGRAM)
-        val token = currentToken
-        if (token is IdentifierToken)
-            scopeManager.addIdentifier(ProgramIdentifier(token.identifier, ScopeManager.programType))
-        accept(TokenType.IDENTIFIER)
-        if (currentToken.type == TokenType.LEFT_BRACKET) {
-            accept(TokenType.LEFT_BRACKET)
-            identifier_list()
-            accept(TokenType.RIGHT_BRACKET)
+    private fun program_heading(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.PROGRAM)
+        checkBeg(starters, followers)
+
+        if (currentToken.type in starters) {
+            accept(TokenType.PROGRAM)
+            val token = currentToken
+            if (token is IdentifierToken)
+                scopeManager.addIdentifier(ProgramIdentifier(token.identifier, ScopeManager.programType))
+            accept(TokenType.IDENTIFIER)
+            if (currentToken.type == TokenType.LEFT_BRACKET) {
+                accept(TokenType.LEFT_BRACKET)
+                identifier_list()
+                accept(TokenType.RIGHT_BRACKET)
+            }
+            accept(TokenType.SEMICOLON)
+            checkEnd(followers)
         }
     }
 
+    /**
+     * identifier-list = identifier { `,' identifier }
+     */
     private fun identifier_list() { // TODO: identifier list for procedures and other usages
         scopeManager.addVariableToBuffer(currentToken)
         accept(TokenType.IDENTIFIER)
@@ -85,65 +121,81 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * <block> ::= <label declaration part> <constant definition part> <type definition part>
      *     <variable declaration part> <procedure and function declaration part> <statement part>
      */
-    private fun block() {
-        type_definition_part()
-        variable_declaration_part()
-        procedure_and_function_declaration_part()
-        statement_part()
+    val block_starters = setOf(TokenType.TYPE, TokenType.VAR, TokenType.FUNCTION, TokenType.PROCEDURE, TokenType.BEGIN)
+    private fun block(followers: Set<TokenType>) {
+        checkBeg(block_starters, followers)
+
+        if (currentToken.type in block_starters) {
+            type_definition_part( followers union setOf(TokenType.VAR, TokenType.PROCEDURE, TokenType.FUNCTION, TokenType.BEGIN))
+            variable_declaration_part(followers union setOf(TokenType.PROCEDURE, TokenType.FUNCTION, TokenType.BEGIN) )
+            procedure_and_function_declaration_part( followers union setOf(TokenType.BEGIN))
+            statement_part()
+
+            checkEnd(followers)
+        }
     }
 
     /**
      * <procedure and function declaration part> ::= {<procedure or function declaration > ;}
      */
-    private fun procedure_and_function_declaration_part() {
+    private fun procedure_and_function_declaration_part(followers: Set<TokenType>) {
+        checkBeg(setOf(TokenType.PROCEDURE, TokenType.FUNCTION), followers)
+
         while (currentToken.type == TokenType.PROCEDURE || currentToken.type == TokenType.FUNCTION) {
-            procedure_or_function_declaration()
+            procedure_or_function_declaration( followers union setOf(TokenType.FUNCTION, TokenType.PROCEDURE))
             accept(TokenType.SEMICOLON)
         }
+        checkEnd(followers)
     }
 
     /**
      * <procedure or function declaration > ::= <procedure declaration> | <function declaration >
      */
-    private fun procedure_or_function_declaration() {
-        if (currentToken.type == TokenType.PROCEDURE) procedure_declaration()
-        else if (currentToken.type == TokenType.FUNCTION) function_declaration()
+    private fun procedure_or_function_declaration(followers: Set<TokenType>) {
+        if (currentToken.type == TokenType.PROCEDURE) procedure_declaration(followers)
+        else if (currentToken.type == TokenType.FUNCTION) function_declaration(followers)
+
+        checkEnd(followers)
     }
 
     /**
      * <procedure declaration> ::= <procedure heading> <block>
      *     // в описании стандарта более сложно
      */
-    private fun procedure_declaration() {
+    private fun procedure_declaration(followers: Set<TokenType>) {
 
         scopeManager.openScope()
 
-        procedure_heading()
-        block()
+        procedure_heading(followers union block_starters)
+        block(followers)
 
         scopeManager.closeScope()
+
+        checkEnd(followers)
     }
 
     /**
-     * <procedure heading> ::= procedure <identifier> ; |
+     * <procedure heading> ::= procedure <identifier> [ formal-parameter-list ]
      */
-    private fun procedure_heading() {
+    private fun procedure_heading(followers: Set<TokenType>) {
         accept(TokenType.PROCEDURE)
         accept(TokenType.IDENTIFIER)
 
         if (currentToken.type == TokenType.LEFT_BRACKET)
-            function_parameter_list()
+            formal_parameter_list(followers)
+
+        checkEnd(followers)
     }
 
     /**
      * formal-parameter-list = `(' formal-parameter-section { ` ;' formal-parameter-section ~ `)' .
      */
-    private fun function_parameter_list() {
+    private fun formal_parameter_list(followers: Set<TokenType>) {
         accept(TokenType.LEFT_BRACKET)
-        formal_parameters_section()
+        formal_parameters_section(followers)
         while (currentToken.type == TokenType.SEMICOLON) {
             accept(TokenType.SEMICOLON)
-            formal_parameters_section()
+            formal_parameters_section(followers)
         }
     }
 
@@ -151,42 +203,47 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * function-declaration = function-heading ` ;' directive | function-identification ` ;' function-block
      *      | function-heading ` ;' function-block .
      */
-    private fun function_declaration() {
+    private fun function_declaration(followers: Set<TokenType>) {
 
         scopeManager.openScope()
 
-        function_heading()
-        block()
+        function_heading(followers union block_starters)
+        block(followers)
 
         scopeManager.closeScope()
+
+        checkEnd(followers)
     }
 
     /**
      * function-heading = `function' identifier [ formal-parameter-list ] ':' result-type .
      */
-    private fun function_heading() {
+    private fun function_heading(followers: Set<TokenType>) {
         accept(TokenType.FUNCTION)
         accept(TokenType.IDENTIFIER)
 
         if (currentToken.type == TokenType.LEFT_BRACKET)
-            function_parameter_list()
+            formal_parameter_list(followers union setOf(TokenType.COLON))
 
         accept(TokenType.COLON)
         type_identifier()
+
+        checkEnd(followers)
     }
 
     /**
      * <formal parameter section> ::= <parameter group> | var <parameter group>
      *     | function <parameter group> | procedure <identifier> { , <identifier>}
      */
-    private fun formal_parameters_section() {
+    private fun formal_parameters_section(followers: Set<TokenType>) {
         when(currentToken.type) {
             TokenType.IDENTIFIER -> value_parameter_section()
             TokenType.VAR -> variable_parameter_section()
-            TokenType.FUNCTION -> function_heading()
-            TokenType.PROCEDURE -> procedure_heading()
+            TokenType.FUNCTION -> function_heading(followers)
+            TokenType.PROCEDURE -> procedure_heading(followers)
             else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
         }
+        checkEnd(followers)
     }
 
     /**
@@ -220,7 +277,9 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <type definition part> ::= <empty> | type <type definition> {;<type definition>};
      */
-    private fun type_definition_part() {
+    private fun type_definition_part(followers: Set<TokenType>) {
+        checkBeg(setOf(TokenType.TYPE), followers)
+
         if (currentToken.type == TokenType.TYPE) {
             accept(TokenType.TYPE)
             type_definition()
@@ -229,6 +288,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
                 type_definition()
                 accept(TokenType.SEMICOLON)
             }
+            checkEnd(followers)
         }
     }
 
@@ -251,7 +311,9 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <variable declaration part> ::= <empty> | var <variable declaration> {; <variable declaration>} ;
      */
-    private fun variable_declaration_part() {
+    private fun variable_declaration_part(followers: Set<TokenType>) {
+        checkBeg(setOf(TokenType.VAR), followers)
+
         if (currentToken.type == TokenType.VAR) {
             accept(TokenType.VAR)
             variable_declaration()
@@ -260,6 +322,8 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
                 variable_declaration()
                 accept(TokenType.SEMICOLON)
             }
+
+            checkEnd(followers)
         }
     }
 
