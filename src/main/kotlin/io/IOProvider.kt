@@ -39,10 +39,17 @@ class IOProvider(fileName: String, val errors: ErrorList) {
     }
 
     private fun listCurrentLine() {
-        println("  ${currentPosition.lineNumber.toString().padStart(2)}   $currentLine")
+        val columnWidth = 6
+        val lineNumberString = currentPosition.lineNumber.toString()
+        val lineNumPadEnd = (columnWidth - lineNumberString.length) / 2
+        println("${lineNumberString.padStart(columnWidth - lineNumPadEnd).padEnd(columnWidth)} $currentLine")
+
         var error = errors.peekError()
         while (error != null) {
-            println("**NO** " + " ".repeat(error.textPosition.charNumber - 1) + "^ ошибка: ${error.errorCode.errorText()}")
+            val errorNumberString = errors.totalErrorsCnt.toString()
+            val errorNumPadEnd = (columnWidth - errorNumberString.length) / 2
+            println(errorNumberString.padStart(columnWidth - errorNumPadEnd, '*').padEnd(columnWidth, '*') +
+                    " ".repeat(error.textPosition.charNumber - 1) + "^ ошибка: ${error.errorCode.errorText()}")
             error = errors.peekError()
         }
     }
