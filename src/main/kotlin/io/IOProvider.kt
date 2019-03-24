@@ -16,10 +16,14 @@ class IOProvider(fileName: String, val errors: ErrorList) {
 
     private fun processNextChar(): Boolean {
         while (currentPosition.charNumber > currentLine.length) {
-            listCurrentLine()
+            if (currentLine != "\u0000")
+                listCurrentLine()
             if (reader.ready())
                 currentLine = reader.readLine() + " "
-            else return false
+            else {
+                currentLine = "\u0000"
+                return false
+            }
             currentPosition.lineNumber++
             currentPosition.charNumber = 1
         }
