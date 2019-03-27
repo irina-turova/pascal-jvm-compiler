@@ -721,8 +721,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
-     * for-statement = `for' control-variable ` :=' initial-value ( `to' | `downto' ) final-value
-     * `do' statement .
+     * for-statement = `for' control-variable ` :=' initial-value ( `to' | `downto' ) final-value `do' statement .
      * control-variable = entire-variable .
      * initial-value = expression .
      * final-value = expression .
@@ -738,5 +737,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             else -> pushError(ErrorCode.TO_OR_DOWNTO_EXPECTED)
         }
         expression()
+        accept(TokenType.DO)
+        statement()
     }
 }
