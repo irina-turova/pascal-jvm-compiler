@@ -5,8 +5,12 @@ import io.TextPosition
 import common.ErrorList
 import common.Error
 import common.ErrorCode
+import kotlin.math.pow
 
 class Lexer(private val io: IOProvider, val errors: ErrorList) {
+
+    private val maxInt = 32767
+    private val maxReal = 1.7 * 10.0.pow(38)
 
     private lateinit var tokenPosition: TextPosition
 
@@ -24,11 +28,41 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
                         KeywordToken(it, tokenPosition)
                 }
             }
-            in '0'..'9' -> { // TODO: full number constants support
+            in '0'..'9' -> {
+                var metDot = false
+                var metE = false
+                var metSign = false
+
                 var number = io.takeNextChar().toString()
-                while (io.nextChar().isDigit())
+                while (io.nextChar().isDigit() || io.nextChar() in setOf('.', 'e', 'E', '+', '-')) {
+                    if (io.nextChar() == '.') {
+                        if (metDot || metE)
+                            break
+                        metDot = true
+                    }
+                    if (io.nextChar().toLowerCase() == 'e') {
+                        if (metE)
+                            break
+                        metE = true
+                    }
+                    if (io.nextChar() == '+' || io.nextChar() == '-') {
+                        if (metSign || number.last().toLowerCase() != 'e')
+                            break
+                        metSign = true
+                    }
                     number += (io.takeNextChar())
-                ConstantToken(TokenType.INT_CONSTANT, tokenPosition, number)
+                }
+
+                ConstantToken(
+                    if (metDot || metE) {
+                        if (number.toDouble() > maxReal)
+                            errors.pushError(Error(tokenPosition, ErrorCode.CONSTANT_OUT_OF_RANGE))
+                        TokenType.DOUBLE_CONSTANT
+                    } else {
+                        if (number.toInt() > maxInt)
+                            errors.pushError(Error(tokenPosition, ErrorCode.CONSTANT_OUT_OF_RANGE))
+                        TokenType.INT_CONSTANT
+                    }, tokenPosition, number)
             }
             '\'' -> {
                 io.takeNextChar()
