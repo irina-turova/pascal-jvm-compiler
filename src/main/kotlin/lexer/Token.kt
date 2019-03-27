@@ -5,21 +5,29 @@ import io.TextPosition
 open class Token(val type: TokenType, val position: TextPosition) {
     companion object {
         val KEYWORDS = mapOf(
-            "program" to TokenType.PROGRAM,
-            "type" to TokenType.TYPE,
-            "var" to TokenType.VAR,
+            "and" to TokenType.AND,
             "begin" to TokenType.BEGIN,
-            "end" to TokenType.END,
-            "if" to TokenType.IF,
-            "then" to TokenType.THEN,
-            "else" to TokenType.ELSE,
+            "div" to TokenType.DIV,
             "do" to TokenType.DO,
+            "downto" to TokenType.DOWN_TO,
+            "else" to TokenType.ELSE,
+            "end" to TokenType.END,
             "for" to TokenType.FOR,
+            "function" to TokenType.FUNCTION,
+            "if" to TokenType.IF,
             "in" to TokenType.IN,
-            "while" to TokenType.WHILE,
+            "mod" to TokenType.MOD,
             "not" to TokenType.NOT,
             "or" to TokenType.OR,
-            "and" to TokenType.AND
+            "procedure" to TokenType.PROCEDURE,
+            "program" to TokenType.PROGRAM,
+            "repeat" to TokenType.REPEAT,
+            "then" to TokenType.THEN,
+            "to" to TokenType.TO,
+            "type" to TokenType.TYPE,
+            "until" to TokenType.UNTIL,
+            "var" to TokenType.VAR,
+            "while" to TokenType.WHILE
         )
     }
 
