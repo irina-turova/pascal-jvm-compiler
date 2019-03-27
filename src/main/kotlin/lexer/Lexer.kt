@@ -12,13 +12,13 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
 
     private fun scanSymbol(): Token {
         return when(io.nextChar()) {
-            in 'a'..'z', in 'A'..'Z', '_'  -> {
+            in 'a'..'z', in 'A'..'Z'  -> {
                 var identifier = io.takeNextChar().toString()
-                while (io.nextChar().isLetterOrDigit() || io.nextChar() == '_')
+                while (io.nextChar().isLetterOrDigit())
                     identifier += io.takeNextChar()
 
-                Token.KEYWORDS.getOrDefault(identifier.toLowerCase(), TokenType.IDENTIFIER).let {
-                    if (it == TokenType.IDENTIFIER)
+                Token.KEYWORDS[identifier.toLowerCase()].let {
+                    if (it == null)
                         IdentifierToken(TokenType.IDENTIFIER, tokenPosition, identifier)
                     else
                         KeywordToken(it, tokenPosition)
