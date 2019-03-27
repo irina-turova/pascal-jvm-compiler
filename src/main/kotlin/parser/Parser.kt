@@ -637,10 +637,8 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * actual-parameter = expression | variable-access | procedure-identifier | function-identifier .
      */
-    private fun actual_parameter() { // TODO: how to choose between expression and variable?
-        when (currentToken.type) {
+    private fun actual_parameter() { // TODO: need parameter info passing..
 
-        }
     }
 
     /**
