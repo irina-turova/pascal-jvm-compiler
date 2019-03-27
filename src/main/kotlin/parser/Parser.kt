@@ -43,7 +43,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
         }
     }
 
-    private fun checkEnd(followers: Set<TokenType>) {
+    private fun checkEnd(followers: Set<TokenType>, error: ErrorCode? = null) {
         if (currentToken.type !in followers) {
             pushError(ErrorCode.UNEXPECTED_SYMBOL)
             skipTo(followers)
@@ -60,6 +60,14 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
         else
             pushError(ErrorCode.fromExpectedToken(expectedToken))
     }
+
+    private val block_starters = setOf(TokenType.TYPE, TokenType.VAR, TokenType.FUNCTION, TokenType.PROCEDURE, TokenType.BEGIN)
+    private val structuredStatementStarters = setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE, TokenType.REPEAT, TokenType.FOR)
+    private val simpleStatementStarters = setOf(TokenType.IDENTIFIER)
+    private val unsignedConstantStarters = setOf(TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT)
+    private val factorStarters = setOf(TokenType.IDENTIFIER, TokenType.LEFT_BRACKET, TokenType.NOT) + unsignedConstantStarters
+    private val termStarters = factorStarters
+    private val simpleExpressionStarters = setOf(TokenType.PLUS, TokenType.MINUS) + termStarters
 
     /**
      * <program> ::= program <identifier> ; <block> .
@@ -96,7 +104,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             accept(TokenType.IDENTIFIER)
             if (currentToken.type == TokenType.LEFT_BRACKET) {
                 accept(TokenType.LEFT_BRACKET)
-                identifier_list()
+                identifier_list(followers + TokenType.RIGHT_BRACKET)
                 accept(TokenType.RIGHT_BRACKET)
             }
             accept(TokenType.SEMICOLON)
@@ -107,13 +115,19 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * identifier-list = identifier { `,' identifier }
      */
-    private fun identifier_list() { // TODO: identifier list for procedures and other usages
-        scopeManager.addVariableToBuffer(currentToken)
-        accept(TokenType.IDENTIFIER)
-        while (currentToken.type == TokenType.COMMA) {
-            accept(TokenType.COMMA)
+    private fun identifier_list(followers: Set<TokenType>) { // TODO: identifier list for procedures and other usages
+        val starters = setOf(TokenType.IDENTIFIER)
+        checkBeg(starters, followers)
+
+        if (currentToken.type in starters) {
             scopeManager.addVariableToBuffer(currentToken)
             accept(TokenType.IDENTIFIER)
+            while (currentToken.type == TokenType.COMMA) {
+                accept(TokenType.COMMA)
+                scopeManager.addVariableToBuffer(currentToken)
+                accept(TokenType.IDENTIFIER)
+            }
+            checkEnd(followers)
         }
     }
 
@@ -121,7 +135,6 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * <block> ::= <label declaration part> <constant definition part> <type definition part>
      *     <variable declaration part> <procedure and function declaration part> <statement part>
      */
-    val block_starters = setOf(TokenType.TYPE, TokenType.VAR, TokenType.FUNCTION, TokenType.PROCEDURE, TokenType.BEGIN)
     private fun block(followers: Set<TokenType>) {
         checkBeg(block_starters, followers)
 
@@ -129,7 +142,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             type_definition_part( followers union setOf(TokenType.VAR, TokenType.PROCEDURE, TokenType.FUNCTION, TokenType.BEGIN))
             variable_declaration_part(followers union setOf(TokenType.PROCEDURE, TokenType.FUNCTION, TokenType.BEGIN) )
             procedure_and_function_declaration_part( followers union setOf(TokenType.BEGIN))
-            statement_part()
+            statement_part(followers)
 
             checkEnd(followers)
         }
@@ -139,18 +152,22 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * <procedure and function declaration part> ::= {<procedure or function declaration > ;}
      */
     private fun procedure_and_function_declaration_part(followers: Set<TokenType>) {
-        checkBeg(setOf(TokenType.PROCEDURE, TokenType.FUNCTION), followers)
+        val starters = setOf(TokenType.PROCEDURE, TokenType.FUNCTION)
+        checkBeg(starters, followers)
 
-        while (currentToken.type == TokenType.PROCEDURE || currentToken.type == TokenType.FUNCTION) {
-            procedure_or_function_declaration( followers union setOf(TokenType.FUNCTION, TokenType.PROCEDURE))
-            accept(TokenType.SEMICOLON)
+        if (currentToken.type in starters) {
+            while (currentToken.type == TokenType.PROCEDURE || currentToken.type == TokenType.FUNCTION) {
+                procedure_or_function_declaration(followers + TokenType.SEMICOLON)
+                accept(TokenType.SEMICOLON)
+            }
+
+            scopeManager.findLocalForwards().forEach {
+                // TODO: Add explanation with func or proc name
+                pushError(ErrorCode.UNDEFINED_FORWARD)
+            }
+
+            checkEnd(followers)
         }
-
-        scopeManager.findLocalForwards().forEach { // TODO: Add explanation with func or proc name
-            pushError(ErrorCode.UNDEFINED_FORWARD)
-        }
-
-        checkEnd(followers)
     }
 
     /**
@@ -174,36 +191,41 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      *      | procedure-heading ` ;' procedure-block . )
      */
     private fun procedure_declaration(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.PROCEDURE)
+        checkBeg(starters, followers)
 
-        scopeManager.openScope()
+        if (currentToken.type in starters) {
 
-        accept(TokenType.PROCEDURE)
+            scopeManager.openScope()
 
-        val identifier = scopeManager.findLocalIdentifier(currentToken)
+            accept(TokenType.PROCEDURE)
 
-        if (identifier == null) {
-            val newIdentifier = procedure_heading(followers union block_starters)
-            accept(TokenType.SEMICOLON)
-            currentToken.let {token ->
-                if (token is IdentifierToken &&  token.identifier.toLowerCase() == "forward") {
-                    accept(TokenType.IDENTIFIER)
-                    newIdentifier.isForward = true
-                } else
-                    block(followers)
+            val identifier = scopeManager.findLocalIdentifier(currentToken)
+
+            if (identifier == null) {
+                val newIdentifier = procedure_heading(followers + TokenType.SEMICOLON)
+                accept(TokenType.SEMICOLON)
+                currentToken.let { token ->
+                    if (token is IdentifierToken && token.identifier.toLowerCase() == "forward") {
+                        accept(TokenType.IDENTIFIER)
+                        newIdentifier.isForward = true
+                    } else
+                        block(followers)
+                }
+            } else if (identifier is ProcedureIdentifier && identifier.isForward) {
+                accept(TokenType.IDENTIFIER)
+                identifier.isForward = false
+                accept(TokenType.SEMICOLON)
+                block(followers)
+            } else {
+                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+                checkEnd(followers)
             }
-        } else if (identifier is ProcedureIdentifier && identifier.isForward) {
-            accept(TokenType.IDENTIFIER)
-            identifier.isForward = false
-            accept(TokenType.SEMICOLON)
-            block(followers)
-        } else {
-            pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+
+            scopeManager.closeScope()
+
             checkEnd(followers)
         }
-
-        scopeManager.closeScope()
-
-        checkEnd(followers)
     }
 
     /**
@@ -354,10 +376,10 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
         if (currentToken.type == TokenType.TYPE) {
             accept(TokenType.TYPE)
-            type_definition()
+            type_definition(followers union setOf(TokenType.SEMICOLON))
             accept(TokenType.SEMICOLON)
             while (currentToken.type == TokenType.IDENTIFIER) {
-                type_definition()
+                type_definition(followers union setOf(TokenType.SEMICOLON))
                 accept(TokenType.SEMICOLON)
             }
             checkEnd(followers)
@@ -367,17 +389,24 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <type definition> ::= <identifier> = <type>
      */
-    private fun type_definition() {
-        val token = currentToken
-        val identifier = if (token is IdentifierToken) TypeIdentifier(token.identifier)
-            else null
-        if (identifier != null && scopeManager.addIdentifier(identifier) != null)
-            pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+    private fun type_definition(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.IDENTIFIER)
+        checkBeg(starters, followers)
 
-        accept(TokenType.IDENTIFIER)
-        accept(TokenType.EQUAL_OPERATOR)
-        val typedef = type()
-        identifier?.type = typedef
+        if (currentToken.type in starters) {
+            val token = currentToken
+            val identifier = if (token is IdentifierToken) TypeIdentifier(token.identifier)
+            else null
+            if (identifier != null && scopeManager.addIdentifier(identifier) != null)
+                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+
+            accept(TokenType.IDENTIFIER)
+            accept(TokenType.EQUAL_OPERATOR)
+            val typedef = type(followers)
+            identifier?.type = typedef
+
+            checkEnd(followers)
+        }
     }
 
     /**
@@ -388,10 +417,10 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
         if (currentToken.type == TokenType.VAR) {
             accept(TokenType.VAR)
-            variable_declaration()
+            variable_declaration(followers union setOf(TokenType.SEMICOLON))
             accept(TokenType.SEMICOLON)
             while (currentToken.type == TokenType.IDENTIFIER) {
-                variable_declaration()
+                variable_declaration(followers union setOf(TokenType.SEMICOLON))
                 accept(TokenType.SEMICOLON)
             }
 
@@ -402,33 +431,45 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <variable declaration> ::= <identifier> {,<identifier>} : <type>
      */
-    private fun variable_declaration() {
-        identifier_list()
-        accept(TokenType.COLON)
-        val variableType = type()
-        scopeManager.flushVariableBuffer(variableType)
+    private fun variable_declaration(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.IDENTIFIER)
+        checkBeg(starters, followers)
+
+        if (currentToken.type in starters) {
+            identifier_list(followers + TokenType.COLON)
+            accept(TokenType.COLON)
+            val variableType = type(followers)
+            scopeManager.flushVariableBuffer(variableType)
+            checkEnd(followers)
+        }
     }
 
     /**
      * <type> ::= <simple type> | <structured type> | <pointer type>
      */
-    private fun type(): Type? {
-        return simple_type()
+    private fun type(followers: Set<TokenType>): Type? {
+        return simple_type(followers)
     }
 
     /**
      * <simple type> ::= <scalar type> | <subrange type> | <type identifier>
      */
-    private fun simple_type(): Type? {
-        if (currentToken.type == TokenType.IDENTIFIER)
-            return type_identifier()
-        else {
-            pushError(ErrorCode.TYPE_IDENTIFIER_EXPECTED)
-            return null
+    private fun simple_type(followers: Set<TokenType>): Type? {
+        val starters = setOf(TokenType.IDENTIFIER)
+        checkBeg(starters, followers)
+
+        var resultType: Type? = null
+
+        if (currentToken.type in starters) {
+            resultType =  type_identifier()
+            checkEnd(followers, ErrorCode.TYPE_IDENTIFIER_EXPECTED)
         }
+
+        return resultType
     }
 
     /**
+     * no neutralization needed
      * <type identifier> ::= <identifier>
      */
     private fun type_identifier(): Type? {
@@ -444,61 +485,88 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <statement part> ::= <compound statement>
      */
-    private fun statement_part() {
-        compound_statement()
+    private fun statement_part(followers: Set<TokenType>) {
+        compound_statement(followers)
     }
 
     /**
      * <compound statement> ::= begin <statement-sequence> end;
      */
-    private fun compound_statement() {
-        accept(TokenType.BEGIN)
+    private fun compound_statement(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.BEGIN)
+        checkBeg(starters, followers)
 
-        statement_sequence()
+        if (currentToken.type in starters) {
+            accept(TokenType.BEGIN)
+            statement_sequence(followers + TokenType.END)
+            accept(TokenType.END)
 
-        accept(TokenType.END)
+            checkEnd(followers)
+        }
     }
 
     /**
      * statement-sequence = statement { ` ;' statement } .
      */
-    private fun statement_sequence() {
-        statement()
-        while (currentToken.type == TokenType.SEMICOLON) {
-            accept(TokenType.SEMICOLON)
-            statement()
+    private fun statement_sequence(followers: Set<TokenType>) {
+        val starters = simpleStatementStarters + structuredStatementStarters
+        checkBeg(starters, followers)
+
+        if (currentToken.type in starters) {
+            statement(followers + TokenType.SEMICOLON)
+            while (currentToken.type == TokenType.SEMICOLON) {
+                accept(TokenType.SEMICOLON)
+                statement(followers + TokenType.SEMICOLON)
+            }
+            checkEnd(followers)
         }
     }
 
     /**
      * <statement> ::= <unlabelled statement> | <label> : <unlabelled statement>
      */
-    private fun statement() {
-        unlabelled_statement()
+    private fun statement(followers: Set<TokenType>) {
+        unlabelled_statement(followers)
     }
 
     /**
      * <unlabelled statement> ::= <simple statement> | <structured statement>
      */
-    private fun unlabelled_statement() {
-        when {
-            currentToken.type == TokenType.IDENTIFIER -> simple_statement()
-            currentToken.type in setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE, TokenType.REPEAT, TokenType.FOR) -> structured_statement()
-            else -> pushError(ErrorCode.IDENTIFIER_EXPECTED) // TODO: check if it's ok
+    private fun unlabelled_statement(followers: Set<TokenType>) {
+        val starters = simpleStatementStarters + structuredStatementStarters
+        checkBeg(starters, followers)
+
+        if (currentToken.type in starters) {
+            when {
+                currentToken.type == TokenType.IDENTIFIER -> simple_statement(followers)
+                currentToken.type in setOf(
+                    TokenType.BEGIN,
+                    TokenType.IF,
+                    TokenType.WHILE,
+                    TokenType.REPEAT,
+                    TokenType.FOR
+                ) -> structured_statement(followers)
+                else -> pushError(ErrorCode.IDENTIFIER_EXPECTED) // TODO: check if it's ok
+            }
+            checkEnd(followers)
         }
     }
 
     /**
      * <simple statement> ::= <assignment statement> | <procedure statement> | <go to statement> | <empty statement>
      */
-    private fun simple_statement() {
-        if (currentToken.type == TokenType.IDENTIFIER) {
+    private fun simple_statement(followers: Set<TokenType>) {
+        checkBeg(simpleStatementStarters, followers)
+
+        if (currentToken.type in simpleStatementStarters) {
             val identifier = scopeManager.findIdentifier(currentToken)
             if (identifier is VariableIdentifier)
-                assignment_statement()
+                assignment_statement(followers)
             else if (identifier is ProcedureIdentifier)
-                procedure_statement()
+                procedure_statement(followers)
             // TODO: do we need also function-designator here?
+
+            checkEnd(followers)
         }
     }
 
@@ -507,68 +575,93 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * | read-parameter-list | readln-parameter-list
      * | write-parameter-list | writeln-parameter-list ) .
      */
-    private fun procedure_statement() {
+    private fun procedure_statement(followers: Set<TokenType>) {
         accept(TokenType.IDENTIFIER)
         actual_parameter_list()
+
+        checkEnd(followers)
     }
 
     /**
      * <assignment statement> ::= <variable> := <expression> | <function identifier> := <expression>
      */
-    private fun assignment_statement() {
-        accept(TokenType.IDENTIFIER)
-        accept(TokenType.ASSIGN_OPERATOR)
-        expression()
+    private fun assignment_statement(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.IDENTIFIER)
+        checkBeg(starters, followers)
+
+        if (currentToken.type in starters) {
+            accept(TokenType.IDENTIFIER)
+            accept(TokenType.ASSIGN_OPERATOR)
+            expression(followers)
+
+            checkEnd(followers)
+        }
     }
 
     /**
      * <structured statement> ::= <compound statement> | <conditional statement> | <repetitive statement> | <with statement>
      */
-    private fun structured_statement() {
-        when(currentToken.type) {
-            TokenType.BEGIN -> compound_statement()
-            TokenType.IF -> conditional_statement()
-            TokenType.WHILE, TokenType.REPEAT, TokenType.FOR -> repetitive_statement()
-            else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE, REPEAT, FOR")
+    private fun structured_statement(followers: Set<TokenType>) {
+        checkBeg(structuredStatementStarters, followers)
+
+        if (currentToken.type in structuredStatementStarters) {
+            when (currentToken.type) {
+                TokenType.BEGIN -> compound_statement(followers)
+                TokenType.IF -> conditional_statement(followers)
+                TokenType.WHILE, TokenType.REPEAT, TokenType.FOR -> repetitive_statement(followers)
+                else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE, REPEAT, FOR")
+            }
+            checkEnd(followers)
         }
     }
 
     /**
      * <conditional statement> ::= <if statement> | <case statement>
      */
-    private fun conditional_statement() {
-        if_statement()
+    private fun conditional_statement(followers: Set<TokenType>) {
+        if_statement(followers)
     }
 
-    /**
+    /** no before neutralization needed
      * <if statement> ::= if <expression> then <statement> | if <expression> then <statement> else <statement>
      */
-    private fun if_statement() {
+    private fun if_statement(followers: Set<TokenType>) {
         accept(TokenType.IF)
-        val expressionType = expression()
+
+        val expressionType = expression(followers + TokenType.THEN)
         if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
             pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
         accept(TokenType.THEN)
-        statement()
+        statement(followers + TokenType.ELSE)
         if (currentToken.type == TokenType.ELSE) {
             accept(TokenType.ELSE)
-            statement()
+            statement(followers)
         }
+        checkEnd(followers)
     }
 
     /**
      * <expression> ::= <simple expression> | <simple expression> <relational operator> <simple expression>
      */
-    private fun expression(): Type? {
-        var resultType = simple_expression()
-        if (currentToken.type in relationalOperators) {
-            val operator = currentToken.type
-            relational_operator()
-            val expType = simple_expression()
-            resultType = if (resultType != null && expType != null)
-                resultType.comparingType(expType, operator)
-                    .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
-            else null
+    private fun expression(followers: Set<TokenType>): Type? {
+        val starters = simpleExpressionStarters
+        checkBeg(starters, followers)
+
+        var resultType: Type? = null
+
+        if (currentToken.type in starters) {
+            resultType = simple_expression(followers + relationalOperators)
+            if (currentToken.type in relationalOperators) {
+                val operator = currentToken.type
+                relational_operator()
+                val expType = simple_expression(followers)
+                resultType = if (resultType != null && expType != null)
+                    resultType.comparingType(expType, operator)
+                        .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
+                else null
+            }
+
+            checkEnd(followers)
         }
         return resultType
     }
@@ -576,28 +669,37 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <simple expression> ::= <term> | <sign> <term>| <simple expression> <adding operator> <term>
      */
-    private fun simple_expression(): Type? {
+    private fun simple_expression(followers: Set<TokenType>): Type? {
+        checkBeg(simpleExpressionStarters, followers)
 
-        var resultType: Type?
+        var resultType: Type? = null
 
-        if (currentToken.type in setOf(TokenType.PLUS, TokenType.MINUS)) {
-            sign()
-            resultType = term()
-            if (resultType != null && !resultType.isSignable())
-                pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
-        } else if (currentToken.type in setOf(TokenType.IDENTIFIER, TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT,
-                TokenType.LEFT_BRACKET, TokenType.NOT))
-            resultType = term()
-        else
-            resultType = null
-        while (currentToken.type in setOf(TokenType.PLUS, TokenType.MINUS, TokenType.OR)) {
-            val operator = currentToken.type
-            adding_operator()
-            val termType = term()
-            resultType = if (resultType != null && termType != null)
-                resultType.addingType(termType, operator)
-                    .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
-            else null
+        if (currentToken.type in simpleExpressionStarters) {
+
+            if (currentToken.type in setOf(TokenType.PLUS, TokenType.MINUS)) {
+                sign()
+                resultType = term(followers + addingOperators)
+
+                if (resultType != null && !resultType.isSignable())
+                    pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
+            } else if (currentToken.type in setOf(
+                    TokenType.IDENTIFIER, TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT,
+                    TokenType.LEFT_BRACKET, TokenType.NOT
+                )
+            )
+                resultType = term(followers + addingOperators)
+
+            while (currentToken.type in addingOperators) {
+                val operator = currentToken.type
+                adding_operator()
+                val termType = term(followers + addingOperators)
+                resultType = if (resultType != null && termType != null)
+                    resultType.addingType(termType, operator)
+                        .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
+                else null
+            }
+
+            checkEnd(followers)
         }
 
         return resultType
@@ -630,16 +732,24 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <term> ::= <factor> | <term> <multiplying operator> <factor>
      */
-    private fun term(): Type? {
-        var resultType = factor()
-        while (currentToken.type in multiplyingOperators) {
-            val operator = currentToken.type
-            multiplying_operator()
-            val factorType = factor()
-            resultType = if (resultType != null && factorType != null)
-                resultType.multiplyingType(factorType, operator)
-                    .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
-            else null
+    private fun term(followers: Set<TokenType>): Type? {
+        checkBeg(termStarters, followers)
+
+        var resultType: Type? = null
+
+        if (currentToken.type in termStarters) {
+            resultType = factor(followers + multiplyingOperators)
+            while (currentToken.type in multiplyingOperators) {
+                val operator = currentToken.type
+                multiplying_operator()
+                val factorType = factor(followers + multiplyingOperators)
+
+                resultType = if (resultType != null && factorType != null)
+                    resultType.multiplyingType(factorType, operator)
+                        .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
+                else null
+            }
+            checkEnd(followers)
         }
         return resultType
     }
@@ -647,42 +757,55 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <factor> ::= <variable> | <unsigned constant> | ( <expression> ) | <function designator> | <set> | not <factor>
      */
-    private fun factor(): Type? {
-        val resultType: Type?
+    private fun factor(followers: Set<TokenType>): Type? {
+        checkBeg(factorStarters, followers)
 
-        when {
-            currentToken.type == TokenType.IDENTIFIER -> {
-                val identifier = scopeManager.findIdentifier(currentToken)
-                when (identifier) {
-                    is VariableIdentifier -> resultType = variable()
-                    is ConstantIdentifier -> {resultType = identifier.type; currentToken = getNextSymbol()}
-                    is FunctionIdentifier -> resultType = function_designator()
-                    null -> resultType = null // TODO: Standard functions or error
-                    else -> resultType = null // TODO: тоже какая-то ошибка, например, если это процедура или тип...
+        var resultType: Type? = null
+
+        if (currentToken.type in factorStarters) {
+
+            when {
+                currentToken.type == TokenType.IDENTIFIER -> {
+                    val identifier = scopeManager.findIdentifier(currentToken)
+                    when (identifier) {
+                        is VariableIdentifier -> resultType = variable()
+                        is ConstantIdentifier -> {
+                            resultType = identifier.type; currentToken = getNextSymbol()
+                        }
+                        is FunctionIdentifier -> resultType = function_designator()
+                        null -> resultType = null // TODO: Standard functions or error
+                        else -> resultType = null // TODO: тоже какая-то ошибка, например, если это процедура или тип...
+                    }
+                }
+                currentToken.type in setOf(
+                    TokenType.INT_CONSTANT,
+                    TokenType.DOUBLE_CONSTANT,
+                    TokenType.CHAR_CONSTANT
+                ) -> resultType = unsingned_constant()
+                currentToken.type == TokenType.LEFT_BRACKET -> {
+                    accept(TokenType.LEFT_BRACKET)
+                    resultType = expression(followers + TokenType.RIGHT_BRACKET)
+                    accept(TokenType.RIGHT_BRACKET)
+                }
+                currentToken.type == TokenType.NOT -> {
+                    accept(TokenType.NOT)
+                    resultType = factor(followers)
+                    if (resultType != null && !resultType.isLogical())
+                        pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
+                }
+                else -> {
+                    pushError(ErrorCode.VARIABLE_IDENTIFIER_EXPECTED) // ?
+                    resultType = null
                 }
             }
-            currentToken.type in setOf(TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT) -> resultType = unsingned_constant()
-            currentToken.type == TokenType.LEFT_BRACKET -> {
-                accept(TokenType.LEFT_BRACKET)
-                resultType = expression()
-                accept(TokenType.RIGHT_BRACKET)
-            }
-            currentToken.type == TokenType.NOT -> {
-                accept(TokenType.NOT)
-                resultType = factor()
-                if (resultType != null && !resultType.isLogical())
-                    pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
-            }
-            else -> {
-                pushError(ErrorCode.VARIABLE_IDENTIFIER_EXPECTED) // ?
-                resultType = null
-            }
+            checkEnd(followers)
         }
 
         return resultType
     }
 
     /**
+     * no neutralization needed
      * function-designator = function-identifier [ actual-parameter-list ] .
      */
     private fun function_designator(): Type? {
@@ -694,6 +817,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
+     * no neutralization needed
      * actual-parameter-list = `(' actual-parameter { `,' actual-parameter } `)' .
      */
     private fun actual_parameter_list() {
@@ -707,6 +831,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
+     * no neutralization needed
      * actual-parameter = expression | variable-access | procedure-identifier | function-identifier .
      */
     private fun actual_parameter() { // TODO: need parameter info passing..
@@ -714,6 +839,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
+     * no neutralization needed
      * <variable> ::= <entire variable> | <component variable> | <referenced variable>
      */
     private fun variable(): Type? {
@@ -723,6 +849,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
+     * no neutralization needed
      * <unsigned constant> ::= <unsigned number> | <string> | < constant identifier> < nil>
      */
     private fun unsingned_constant(): Type? {
@@ -778,55 +905,60 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
+     * no before neutralization needed
      * <repetitive statement> ::= <while statement> | <repeat statemant> | <for statement>
      */
-    private fun repetitive_statement() {
+    private fun repetitive_statement(followers: Set<TokenType>) {
         when (currentToken.type) {
-            TokenType.WHILE -> while_statement()
-            TokenType.REPEAT -> repeat_statement()
-            TokenType.FOR -> for_statement()
+            TokenType.WHILE -> while_statement(followers)
+            TokenType.REPEAT -> repeat_statement(followers)
+            TokenType.FOR -> for_statement(followers)
             else -> throw Exception("Unexpected error - here MUST be one of WHILE, REPEAT, FOR")
         }
+        checkEnd(followers)
     }
 
     /**
+     * no before neutralization needed
      * <while statement> ::= while <expression> do <statement>
      */
-    private fun while_statement() {
+    private fun while_statement(followers: Set<TokenType>) {
         accept(TokenType.WHILE)
-        expression()
+        expression(followers + TokenType.DO)
         accept(TokenType.DO)
-        statement()
+        statement(followers)
     }
 
     /**
+     * no before neutralization needed
      * repeat-statement = `repeat' statement-sequence `until' Boolean-expression
      */
-    private fun repeat_statement() {
+    private fun repeat_statement(followers: Set<TokenType>) {
         accept(TokenType.REPEAT)
-        statement_sequence()
+        statement_sequence(followers + TokenType.UNTIL)
         accept(TokenType.UNTIL)
-        expression()
+        expression(followers)
     }
 
     /**
+     * no before neutralization needed
      * for-statement = `for' control-variable ` :=' initial-value ( `to' | `downto' ) final-value `do' statement .
      * control-variable = entire-variable .
      * initial-value = expression .
      * final-value = expression .
      */
-    private fun for_statement() {
+    private fun for_statement(followers: Set<TokenType>) {
         accept(TokenType.FOR)
         variable()
         accept(TokenType.ASSIGN_OPERATOR)
-        expression()
+        expression(followers + TokenType.TO + TokenType.DOWN_TO)
         when (currentToken.type) {
             TokenType.TO -> accept(TokenType.TO)
             TokenType.DOWN_TO -> accept(TokenType.DOWN_TO)
             else -> pushError(ErrorCode.TO_OR_DOWNTO_EXPECTED)
         }
-        expression()
+        expression(followers + TokenType.DO)
         accept(TokenType.DO)
-        statement()
+        statement(followers)
     }
 }
