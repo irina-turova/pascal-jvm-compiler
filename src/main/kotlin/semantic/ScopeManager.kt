@@ -2,6 +2,7 @@ package semantic
 
 import lexer.IdentifierToken
 import lexer.Token
+import semantic.identifiers.ExecutableIdentifier
 import semantic.identifiers.Identifier
 import semantic.identifiers.TypeIdentifier
 import semantic.identifiers.VariableIdentifier
@@ -48,6 +49,20 @@ class ScopeManager {
     fun flushVariableBuffer(type: Type?) {
         variablesBuffer.forEach { it.type = type }
         variablesBuffer.clear()
+    }
+
+    fun findLocalIdentifier(token: Token): Identifier? {
+        if (token !is IdentifierToken)
+            return null
+        scopes.peek().findIdentifier(token.identifier)?.let {
+            return it
+        }
+
+        return null
+    }
+
+    fun findLocalForwards(): List<ExecutableIdentifier> {
+        return scopes.peek().findForwards()
     }
 
     fun findIdentifier(token: Token): Identifier? {

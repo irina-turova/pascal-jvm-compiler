@@ -145,6 +145,11 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             procedure_or_function_declaration( followers union setOf(TokenType.FUNCTION, TokenType.PROCEDURE))
             accept(TokenType.SEMICOLON)
         }
+
+        scopeManager.findLocalForwards().forEach { // TODO: Add explanation with func or proc name
+            pushError(ErrorCode.UNDEFINED_FORWARD)
+        }
+
         checkEnd(followers)
     }
 
@@ -159,15 +164,42 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
-     * <procedure declaration> ::= <procedure heading> <block>
-     *     // в описании стандарта более сложно
+     * procedure-declaration = procedure-heading ` ;' directive
+     * | procedure-identification ` ;' procedure-block
+     * | procedure-heading ` ;' procedure-block .
+     *
+     * we change to:
+     * procedure-declaration = `procedure` ( procedure-heading ` ;' directive
+     *      | procedure-identification ` ;' procedure-block
+     *      | procedure-heading ` ;' procedure-block . )
      */
     private fun procedure_declaration(followers: Set<TokenType>) {
 
         scopeManager.openScope()
 
-        procedure_heading(followers union block_starters)
-        block(followers)
+        accept(TokenType.PROCEDURE)
+
+        val identifier = scopeManager.findLocalIdentifier(currentToken)
+
+        if (identifier == null) {
+            val newIdentifier = procedure_heading(followers union block_starters)
+            accept(TokenType.SEMICOLON)
+            currentToken.let {token ->
+                if (token is IdentifierToken &&  token.identifier.toLowerCase() == "forward") {
+                    accept(TokenType.IDENTIFIER)
+                    newIdentifier.isForward = true
+                } else
+                    block(followers)
+            }
+        } else if (identifier is ProcedureIdentifier && identifier.isForward) {
+            accept(TokenType.IDENTIFIER)
+            identifier.isForward = false
+            accept(TokenType.SEMICOLON)
+            block(followers)
+        } else {
+            pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+            checkEnd(followers)
+        }
 
         scopeManager.closeScope()
 
@@ -176,19 +208,26 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
     /**
      * <procedure heading> ::= procedure <identifier> [ formal-parameter-list ]
+     *
+     *  we change to
+     *  <procedure heading> ::= <identifier> [ formal-parameter-list ]
      */
-    private fun procedure_heading(followers: Set<TokenType>) {
-        accept(TokenType.PROCEDURE)
+    private fun procedure_heading(followers: Set<TokenType>): ProcedureIdentifier {
+        val identifier = ProcedureIdentifier((currentToken as IdentifierToken).identifier)
+        scopeManager.addIdentifier(identifier)
+
         accept(TokenType.IDENTIFIER)
 
         if (currentToken.type == TokenType.LEFT_BRACKET)
             formal_parameter_list(followers)
 
         checkEnd(followers)
+
+        return identifier
     }
 
     /**
-     * formal-parameter-list = `(' formal-parameter-section { ` ;' formal-parameter-section ~ `)' .
+     * formal-parameter-list = `(' formal-parameter-section { ` ;' formal-parameter-section } `)' .
      */
     private fun formal_parameter_list(followers: Set<TokenType>) {
         accept(TokenType.LEFT_BRACKET)
@@ -197,18 +236,44 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             accept(TokenType.SEMICOLON)
             formal_parameters_section(followers)
         }
+        accept(TokenType.RIGHT_BRACKET)
     }
 
     /**
      * function-declaration = function-heading ` ;' directive | function-identification ` ;' function-block
      *      | function-heading ` ;' function-block .
+     *      
+     * we change to:
+     * function-declaration = `function` (function-heading ` ;' directive | function-identification ` ;' function-block
+     *      | function-heading ` ;' function-block )
      */
     private fun function_declaration(followers: Set<TokenType>) {
 
         scopeManager.openScope()
 
-        function_heading(followers union block_starters)
-        block(followers)
+        accept(TokenType.FUNCTION)
+
+        val identifier = scopeManager.findLocalIdentifier(currentToken)
+
+        if (identifier == null) {
+            val newIdentifier = function_heading(followers union block_starters)
+            accept(TokenType.SEMICOLON)
+            currentToken.let {token ->
+                if (token is IdentifierToken &&  token.identifier.toLowerCase() == "forward") {
+                    accept(TokenType.IDENTIFIER)
+                    newIdentifier.isForward = true
+                } else
+                    block(followers)
+            }
+        } else if (identifier is FunctionIdentifier && identifier.isForward) {
+            accept(TokenType.IDENTIFIER)
+            identifier.isForward = false
+            accept(TokenType.SEMICOLON)
+            block(followers)
+        } else {
+            pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+            checkEnd(followers)
+        }
 
         scopeManager.closeScope()
 
@@ -217,18 +282,25 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
     /**
      * function-heading = `function' identifier [ formal-parameter-list ] ':' result-type .
+     * 
+     * we change to:
+     * function-heading = identifier [ formal-parameter-list ] ':' result-type .
      */
-    private fun function_heading(followers: Set<TokenType>) {
-        accept(TokenType.FUNCTION)
+    private fun function_heading(followers: Set<TokenType>): FunctionIdentifier {
+        val identifier = FunctionIdentifier((currentToken as IdentifierToken).identifier)
+        scopeManager.addIdentifier(identifier)
+
         accept(TokenType.IDENTIFIER)
 
         if (currentToken.type == TokenType.LEFT_BRACKET)
-            formal_parameter_list(followers union setOf(TokenType.COLON))
+            formal_parameter_list(followers)
 
         accept(TokenType.COLON)
-        type_identifier()
+        identifier.resultType = type_identifier()
 
         checkEnd(followers)
+
+        return identifier
     }
 
     /**
@@ -243,7 +315,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             TokenType.PROCEDURE -> procedure_heading(followers)
             else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
         }
-        checkEnd(followers)
+        // checkEnd(followers)
     }
 
     /**
