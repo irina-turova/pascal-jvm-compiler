@@ -411,8 +411,8 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     private fun unlabelled_statement() {
         when {
             currentToken.type == TokenType.IDENTIFIER -> simple_statement()
-            currentToken.type in setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE) -> structured_statement()
-            else -> pushError(ErrorCode.IDENTIFIER_EXPECTED) // ?
+            currentToken.type in setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE, TokenType.REPEAT, TokenType.FOR) -> structured_statement()
+            else -> pushError(ErrorCode.IDENTIFIER_EXPECTED) // TODO: check if it's ok
         }
     }
 
@@ -420,8 +420,24 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * <simple statement> ::= <assignment statement> | <procedure statement> | <go to statement> | <empty statement>
      */
     private fun simple_statement() {
-        if (currentToken.type == TokenType.IDENTIFIER)
-            assignment_statement()
+        if (currentToken.type == TokenType.IDENTIFIER) {
+            val identifier = scopeManager.findIdentifier(currentToken)
+            if (identifier is VariableIdentifier)
+                assignment_statement()
+            else if (identifier is ProcedureIdentifier)
+                procedure_statement()
+            // TODO: do we need also function-designator here?
+        }
+    }
+
+    /**
+     * procedure-statement = procedure-identifier ( [ actual-parameter-list ]
+     * | read-parameter-list | readln-parameter-list
+     * | write-parameter-list | writeln-parameter-list ) .
+     */
+    private fun procedure_statement() {
+        accept(TokenType.IDENTIFIER)
+        actual_parameter_list()
     }
 
     /**
@@ -606,7 +622,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
-     * actual-parameter-list = `(' actual-parameter f `,' actual-parameter g `)' .
+     * actual-parameter-list = `(' actual-parameter { `,' actual-parameter } `)' .
      */
     private fun actual_parameter_list() {
         accept(TokenType.LEFT_BRACKET)
@@ -615,13 +631,16 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             accept(TokenType.COMMA)
             actual_parameter()
         }
+        accept(TokenType.RIGHT_BRACKET)
     }
 
     /**
      * actual-parameter = expression | variable-access | procedure-identifier | function-identifier .
      */
-    private fun actual_parameter() {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    private fun actual_parameter() { // TODO: how to choose between expression and variable?
+        when (currentToken.type) {
+
+        }
     }
 
     /**
