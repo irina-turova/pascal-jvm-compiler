@@ -377,18 +377,25 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     }
 
     /**
-     * <compound statement> ::= begin <statement> {; <statement> } end;
+     * <compound statement> ::= begin <statement-sequence> end;
      */
     private fun compound_statement() {
         accept(TokenType.BEGIN)
 
+        statement_sequence()
+
+        accept(TokenType.END)
+    }
+
+    /**
+     * statement-sequence = statement { ` ;' statement } .
+     */
+    private fun statement_sequence() {
         statement()
         while (currentToken.type == TokenType.SEMICOLON) {
             accept(TokenType.SEMICOLON)
             statement()
         }
-
-        accept(TokenType.END)
     }
 
     /**
@@ -430,11 +437,11 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * <structured statement> ::= <compound statement> | <conditional statement> | <repetitive statement> | <with statement>
      */
     private fun structured_statement() {
-        when {
-            currentToken.type == TokenType.BEGIN -> compound_statement()
-            currentToken.type == TokenType.IF -> conditional_statement()
-            currentToken.type == TokenType.WHILE -> repetitive_statement()
-            else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE")
+        when(currentToken.type) {
+            TokenType.BEGIN -> compound_statement()
+            TokenType.IF -> conditional_statement()
+            TokenType.WHILE, TokenType.REPEAT, TokenType.FOR -> repetitive_statement()
+            else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE, REPEAT, FOR")
         }
     }
 
@@ -685,7 +692,12 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * <repetitive statement> ::= <while statement> | <repeat statemant> | <for statement>
      */
     private fun repetitive_statement() {
-        while_statement()
+        when (currentToken.type) {
+            TokenType.WHILE -> while_statement()
+            TokenType.REPEAT -> repeat_statement()
+            TokenType.FOR -> for_statement()
+            else -> throw Exception("Unexpected error - here MUST be one of WHILE, REPEAT, FOR")
+        }
     }
 
     /**
@@ -696,5 +708,35 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
         expression()
         accept(TokenType.DO)
         statement()
+    }
+
+    /**
+     * repeat-statement = `repeat' statement-sequence `until' Boolean-expression
+     */
+    private fun repeat_statement() {
+        accept(TokenType.REPEAT)
+        statement_sequence()
+        accept(TokenType.UNTIL)
+        expression()
+    }
+
+    /**
+     * for-statement = `for' control-variable ` :=' initial-value ( `to' | `downto' ) final-value
+     * `do' statement .
+     * control-variable = entire-variable .
+     * initial-value = expression .
+     * final-value = expression .
+     */
+    private fun for_statement() {
+        accept(TokenType.FOR)
+        variable()
+        accept(TokenType.ASSIGN_OPERATOR)
+        expression()
+        when (currentToken.type) {
+            TokenType.TO -> accept(TokenType.TO)
+            TokenType.DOWN_TO -> accept(TokenType.DOWN_TO)
+            else -> pushError(ErrorCode.TO_OR_DOWNTO_EXPECTED)
+        }
+        expression()
     }
 }
