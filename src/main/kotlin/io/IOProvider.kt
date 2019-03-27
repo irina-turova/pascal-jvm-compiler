@@ -19,7 +19,7 @@ class IOProvider(fileName: String, val errors: ErrorList) {
             if (currentLine != "\u0000")
                 listCurrentLine()
             if (reader.ready())
-                currentLine = reader.readLine() + " "
+                currentLine = reader.readLine().replace("\t", " ".repeat(4)) + " "
             else {
                 currentLine = "\u0000"
                 return false
