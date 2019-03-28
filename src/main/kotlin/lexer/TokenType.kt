@@ -1,7 +1,5 @@
 package lexer
 
-import java.lang.Error
-
 enum class TokenType {
     NOTHING,
 

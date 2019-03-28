@@ -5,7 +5,7 @@ import semantic.types.Type
 open class Parameter {
 }
 
-class SimpleParameter(val type: Type, val mode: TransmissionMode): Parameter()
+class SimpleParameter(val name: String, var type: Type?, var mode: TransmissionMode): Parameter()
 
 class ExecutableParameter: Parameter() {
     val parameterTypes = mutableListOf<Type>()
