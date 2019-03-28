@@ -19,7 +19,6 @@ open class Token(val type: TokenType, val position: TextPosition) {
             "mod" to TokenType.MOD,
             "not" to TokenType.NOT,
             "or" to TokenType.OR,
-            "procedure" to TokenType.PROCEDURE,
             "program" to TokenType.PROGRAM,
             "repeat" to TokenType.REPEAT,
             "then" to TokenType.THEN,

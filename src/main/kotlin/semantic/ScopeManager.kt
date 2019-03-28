@@ -2,10 +2,7 @@ package semantic
 
 import lexer.IdentifierToken
 import lexer.Token
-import semantic.identifiers.ExecutableIdentifier
-import semantic.identifiers.Identifier
-import semantic.identifiers.TypeIdentifier
-import semantic.identifiers.VariableIdentifier
+import semantic.identifiers.*
 import semantic.types.ProgramType
 import semantic.types.ScalarType
 import semantic.types.Type
@@ -31,8 +28,12 @@ class ScopeManager {
         addIdentifier(TypeIdentifier("char", charType))
     }
 
-    fun openScope() {
-        scopes.push(Scope())
+    fun openScope(function: FunctionIdentifier? = null) {
+        val scope = Scope()
+        function?.parameters?.filterNotNull()?.forEach { param ->
+            scope.addIdentifier(VariableIdentifier(param.name, param.type))
+        }
+        scopes.push(scope)
     }
 
 

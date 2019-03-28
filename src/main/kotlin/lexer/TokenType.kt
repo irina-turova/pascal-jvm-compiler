@@ -68,7 +68,5 @@ enum class TokenType {
 
     THIS_IS_THE_END,
 
-    PROCEDURE,
-
     FUNCTION
 }

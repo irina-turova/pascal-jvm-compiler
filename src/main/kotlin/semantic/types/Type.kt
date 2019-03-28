@@ -12,13 +12,11 @@ abstract class Type {
         return this == ScopeManager.booleanType
     }
 
-    fun isCompatibleTo(other: Type): Boolean { // TODO: may be it's like implicit cast then change int, real case
+    fun isCompatibleTo(other: Type): Boolean { // TODO: Проверить для своих типов...
         return when(this) {
-            ScopeManager.integerType, ScopeManager.realType ->
+             ScopeManager.realType ->
                 other in setOf(ScopeManager.integerType, ScopeManager.realType)
-            ScopeManager.booleanType -> other == ScopeManager.booleanType
-            ScopeManager.charType -> other == ScopeManager.charType
-            else -> false
+            else -> this == other
         }
     }
 

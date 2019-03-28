@@ -34,6 +34,7 @@ enum class ErrorCode(val code: Int) {
 
     NO_NAME_ERROR(152),
     UNEXPECTED_SYMBOL(-1),
+    WRONG_NUMBER_OF_PARAMETERS(-2),
 
     ;
 
@@ -42,6 +43,7 @@ enum class ErrorCode(val code: Int) {
     }
 
     private val codesToMessage = mapOf(
+        -2 to "Wrong number of parameters - Неверное количество параметров",
         -1 to "Unexpected symbol - Неожиданный символ",
         1 to "Out of memory - Выход за границы памяти",
         2 to "Identifier expected - He указан идентификатор",
