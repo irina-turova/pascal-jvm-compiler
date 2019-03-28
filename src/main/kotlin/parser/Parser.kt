@@ -801,6 +801,10 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
                 neededParameter == null -> expression(followers)
                 neededParameter.mode == TransmissionMode.VALUE -> expression(followers)
                 neededParameter.mode == TransmissionMode.VARIABLE -> variable()
+                else -> null
+            }?.let { type ->
+                if (neededParameter?.type?.isCompatibleTo(type) == false)
+                    pushError(ErrorCode.TYPE_MISMATCH)
             }
             checkEnd(followers)
         }
