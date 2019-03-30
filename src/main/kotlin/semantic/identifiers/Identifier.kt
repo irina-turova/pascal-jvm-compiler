@@ -1,6 +1,6 @@
 package semantic.identifiers
 
-import semantic.Parameter
+import semantic.parameters.Parameter
 import semantic.types.Type
 
 abstract class Identifier(open val name: String, var type: Type?)

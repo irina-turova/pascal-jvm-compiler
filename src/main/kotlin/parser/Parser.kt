@@ -8,9 +8,9 @@ import common.ErrorList
 import common.ErrorCode
 import common.Error
 import lexer.IdentifierToken
-import semantic.Parameter
+import semantic.parameters.Parameter
 import semantic.ScopeManager
-import semantic.TransmissionMode
+import semantic.parameters.TransmissionMode
 import semantic.types.Type
 import semantic.identifiers.*
 
