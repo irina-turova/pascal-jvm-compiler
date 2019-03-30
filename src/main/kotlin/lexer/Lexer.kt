@@ -77,26 +77,26 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
             }
             ':' -> {
                 io.takeNextChar()
-                return if (io.nextChar() == '=')
+                if (io.nextChar() == '=')
                     Token(TokenType.ASSIGN_OPERATOR, tokenPosition).also { io.takeNextChar() }
                 else
                     Token(TokenType.COLON, tokenPosition)
             }
             ';' -> {
                 io.takeNextChar()
-                return Token(TokenType.SEMICOLON, tokenPosition)
+                Token(TokenType.SEMICOLON, tokenPosition)
             }
             ',' -> {
                 io.takeNextChar()
-                return Token(TokenType.COMMA, tokenPosition)
+                Token(TokenType.COMMA, tokenPosition)
             }
             '^' -> {
                 io.takeNextChar()
-                return Token(TokenType.CARET, tokenPosition)
+                Token(TokenType.CARET, tokenPosition)
             }
             '<' -> {
                 io.takeNextChar()
-                return when {
+                when {
                     io.nextChar() == '=' -> Token(TokenType.LESS_OR_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
                     io.nextChar() == '>' -> Token(TokenType.NOT_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
                     else -> Token(TokenType.LESS_OPERATOR, tokenPosition)
@@ -104,76 +104,76 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
             }
             '>' -> {
                 io.takeNextChar()
-                return if (io.nextChar() == '=')
+                if (io.nextChar() == '=')
                     Token(TokenType.GREATER_OR_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
                 else
                     Token(TokenType.GREATER_OPERATOR, tokenPosition)
             }
             '.' -> {
                 io.takeNextChar()
-                return if (io.nextChar() == '.')
+                if (io.nextChar() == '.')
                     Token(TokenType.DOT_DOT, tokenPosition).also { io.takeNextChar() }
                 else
                     Token(TokenType.DOT, tokenPosition)
             }
             '+' -> {
                 io.takeNextChar()
-                return Token(TokenType.PLUS, tokenPosition)
+                Token(TokenType.PLUS, tokenPosition)
             }
             '-' -> {
                 io.takeNextChar()
-                return Token(TokenType.MINUS, tokenPosition)
+                Token(TokenType.MINUS, tokenPosition)
             }
             '*' -> {
                 io.takeNextChar()
-                return if (io.nextChar() == ')')
-                    Token(TokenType.START_COMMENT_STAR, tokenPosition).also { io.takeNextChar() }
+                if (io.nextChar() == ')')
+                    Token(TokenType.END_COMMENT_STAR, tokenPosition).also { io.takeNextChar() }
                 else
                     Token(TokenType.STAR, tokenPosition)
             }
             '/' -> {
                 io.takeNextChar()
-                return Token(TokenType.SLASH, tokenPosition)
+                Token(TokenType.SLASH, tokenPosition)
             }
             '=' -> {
                 io.takeNextChar()
-                return Token(TokenType.EQUAL_OPERATOR, tokenPosition)
+                Token(TokenType.EQUAL_OPERATOR, tokenPosition)
             }
             '(' -> {
                 io.takeNextChar()
-                return if (io.nextChar() == '*')
-                    Token(TokenType.END_COMMENT_STAR, tokenPosition).also { io.takeNextChar() }
+                if (io.nextChar() == '*')
+                    Token(TokenType.START_COMMENT_STAR, tokenPosition).also { io.takeNextChar() }
                 else
                     Token(TokenType.LEFT_BRACKET, tokenPosition)
             }
             ')' -> {
                 io.takeNextChar()
-                return Token(TokenType.RIGHT_BRACKET, tokenPosition)
+                Token(TokenType.RIGHT_BRACKET, tokenPosition)
             }
             '{' -> {
                 io.takeNextChar()
-                return Token(TokenType.LEFT_CURLY_BRACKET, tokenPosition)
+                Token(TokenType.LEFT_CURLY_BRACKET, tokenPosition)
             }
             '}' -> {
                 io.takeNextChar()
-                return Token(TokenType.RIGHT_CURLY_BRACKET, tokenPosition)
+                Token(TokenType.RIGHT_CURLY_BRACKET, tokenPosition)
             }
             '[' -> {
                 io.takeNextChar()
-                return Token(TokenType.LEFT_SQUARE_BRACKET, tokenPosition)
+                Token(TokenType.LEFT_SQUARE_BRACKET, tokenPosition)
             }
             ']' -> {
                 io.takeNextChar()
-                return Token(TokenType.RIGHT_SQUARE_BRACKET, tokenPosition)
+                Token(TokenType.RIGHT_SQUARE_BRACKET, tokenPosition)
             }
             '\u0000' -> {
                 io.takeNextChar()
-                return Token(TokenType.THIS_IS_THE_END, tokenPosition)
+                Token(TokenType.THIS_IS_THE_END, tokenPosition)
             }
             else -> {
                 io.takeNextChar()
                 errors.pushError(Error(tokenPosition, ErrorCode.NO_NAME_ERROR))
-                return Token(TokenType.NOTHING, tokenPosition)
+                Token(TokenType.NOTHING, tokenPosition)
             }
         }
     }

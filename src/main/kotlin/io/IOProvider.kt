@@ -42,6 +42,7 @@ class IOProvider(fileName: String, val errors: ErrorList) {
         else '\u0000'
     }
 
+    var errorNumber = 1
     private fun listCurrentLine() {
         val columnWidth = 6
         val lineNumberString = currentPosition.lineNumber.toString()
@@ -50,7 +51,7 @@ class IOProvider(fileName: String, val errors: ErrorList) {
 
         var error = errors.peekError()
         while (error != null) {
-            val errorNumberString = errors.totalErrorsCnt.toString()
+            val errorNumberString = (errorNumber++).toString()
             val errorNumPadEnd = (columnWidth - errorNumberString.length) / 2
             println(errorNumberString.padStart(columnWidth - errorNumPadEnd, '*').padEnd(columnWidth, '*') +
                     " ".repeat(error.textPosition.charNumber - 1) + "^ ошибка: ${error.errorCode.errorText()}")

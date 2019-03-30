@@ -69,7 +69,7 @@ class ScopeManager {
     fun findIdentifier(token: Token): Identifier? {
         if (token !is IdentifierToken)
             return null
-        for (scope in scopes.elements()) { // !! check elements order
+        for (scope in scopes.elements().toList().reversed()) { // !! check elements order
             scope.findIdentifier(token.identifier)?.let {
                 return it
             }
