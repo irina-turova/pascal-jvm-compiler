@@ -7,7 +7,7 @@ import common.Error
 import common.ErrorCode
 import kotlin.math.pow
 
-class Lexer(private val io: IOProvider, val errors: ErrorList) {
+class Lexer(private val io: IOProvider, private val errors: ErrorList) {
 
     private val maxInt = 32767
     private val maxReal = 1.7 * 10.0.pow(38)

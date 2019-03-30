@@ -14,7 +14,7 @@ import semantic.parameters.TransmissionMode
 import semantic.types.Type
 import semantic.identifiers.*
 
-class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeManager) {
+class Parser(private val lexer: Lexer, private val errors: ErrorList, private val scopeManager: ScopeManager) {
 
     private var currentToken: Token
 
@@ -119,7 +119,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * identifier-list = identifier { `,' identifier }
      */
-    private fun identifier_list(followers: Set<TokenType>) { // TODO: identifier list for procedures and other usages
+    private fun identifier_list(followers: Set<TokenType>) {
         val starters = setOf(TokenType.IDENTIFIER)
         checkBeg(starters, followers)
 
@@ -234,7 +234,6 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             identifier.isForward = false
             accept(TokenType.SEMICOLON)
             scopeManager.openScope(identifier)
-            // TODO: add procedure parameters to local scope
             block(followers)
             scopeManager.closeScope()
         } else {
@@ -557,7 +556,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
             val identifierType = identifier?.type
             if (identifierType != null && expressionType != null && !identifierType.isCompatibleTo(expressionType))
-                pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
+                pushError(ErrorCode.ILLEGAL_ASSIGNMENT)
 
             checkEnd(followers)
         }
@@ -673,7 +672,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <adding operator> ::= + | - | or
      */
-    val addingOperators = setOf(TokenType.PLUS, TokenType.MINUS, TokenType.OR)
+    private val addingOperators = setOf(TokenType.PLUS, TokenType.MINUS, TokenType.OR)
     private fun adding_operator() {
         for (opToken in addingOperators)
             if (currentToken.type == opToken) {
@@ -738,8 +737,10 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
                             resultType = identifier.type; currentToken = getNextSymbol()
                         }
                         is FunctionIdentifier -> resultType = function_designator(followers)
-                        null -> resultType = null // TODO: Standard functions or error
-                        else -> resultType = null // TODO: тоже какая-то ошибка, например, если это процедура или тип...
+                        else -> {
+                            pushError(ErrorCode.IDENTIFIER_EXPECTED)
+                            resultType = null
+                        }
                     }
                 }
                 currentToken.type in setOf(
@@ -778,7 +779,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
         val resultType = identifier.resultType
         accept(TokenType.IDENTIFIER)
         if (currentToken.type == TokenType.LEFT_BRACKET)
-            actual_parameter_list(followers, identifier.parameters) // TODO: check parameters list types
+            actual_parameter_list(followers, identifier.parameters)
         else if (identifier.parameters.isNotEmpty())
             pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
 
@@ -883,7 +884,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <multiplying operator> ::= * | / | div | mod | and
      */
-    val multiplyingOperators = setOf(TokenType.STAR, TokenType.SLASH, TokenType.DIV,
+    private val multiplyingOperators = setOf(TokenType.STAR, TokenType.SLASH, TokenType.DIV,
         TokenType.MOD, TokenType.AND)
     private fun multiplying_operator() {
         for (opToken in relationalOperators)
@@ -897,7 +898,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * <relational operator> ::= = | <> | < | <= | >= | > | in
      */
-    val relationalOperators = setOf(TokenType.EQUAL_OPERATOR, TokenType.NOT_EQUAL_OPERATOR, TokenType.LESS_OPERATOR,
+    private val relationalOperators = setOf(TokenType.EQUAL_OPERATOR, TokenType.NOT_EQUAL_OPERATOR, TokenType.LESS_OPERATOR,
         TokenType.LESS_OR_EQUAL_OPERATOR, TokenType.GREATER_OR_EQUAL_OPERATOR, TokenType.GREATER_OPERATOR)
     private fun relational_operator() {
         for (opToken in relationalOperators)

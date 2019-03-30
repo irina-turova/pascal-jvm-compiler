@@ -2,7 +2,7 @@ package common
 
 import lexer.TokenType
 
-enum class ErrorCode(val code: Int) {
+enum class ErrorCode(private val code: Int) {
     ERROR(34),
 
     IDENTIFIER_EXPECTED(2),
@@ -16,6 +16,7 @@ enum class ErrorCode(val code: Int) {
     END_EXPECTED(37),
     BOOLEAN_EXPRESSION_EXPECTED(40),
     OPERAND_TYPES_DO_NOT_MATCH_OPERATOR(41),
+    ILLEGAL_ASSIGNMENT(43),
     DO_EXPECTED(50),
     THEN_EXPECTED(57),
     TO_OR_DOWNTO_EXPECTED(58),

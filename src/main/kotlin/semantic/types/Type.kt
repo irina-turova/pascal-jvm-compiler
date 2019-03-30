@@ -4,7 +4,7 @@ import lexer.TokenType
 import semantic.ScopeManager
 
 abstract class Type {
-    fun isSignable(): Boolean { // TODO: Проверить для своих типов...
+    fun isSignable(): Boolean {
         return this == ScopeManager.integerType || this == ScopeManager.realType
     }
 
@@ -12,7 +12,7 @@ abstract class Type {
         return this == ScopeManager.booleanType
     }
 
-    fun isCompatibleTo(other: Type): Boolean { // TODO: Проверить для своих типов...
+    fun isCompatibleTo(other: Type): Boolean {
         return when(this) {
              ScopeManager.realType ->
                 other in setOf(ScopeManager.integerType, ScopeManager.realType)

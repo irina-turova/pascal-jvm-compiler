@@ -4,9 +4,7 @@ import java.util.*
 
 class ErrorList {
     private val errors = ArrayDeque<Error>()
-    private val ERRORS_LIMIT = 5
-
-    var totalErrorsCnt = 0
+    private val errorsLimit = 5
 
     fun peekError(): Error? {
         return if (errors.isNotEmpty())
@@ -16,7 +14,7 @@ class ErrorList {
     }
 
     fun pushError(error: Error) {
-        if (errors.size < ERRORS_LIMIT)
-            errors.addLast(error).also { totalErrorsCnt++ }
+        if (errors.size < errorsLimit)
+            errors.addLast(error)
     }
 }

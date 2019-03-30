@@ -4,14 +4,14 @@ import java.io.File
 import java.lang.Exception
 import common.ErrorList
 
-class IOProvider(fileName: String, val errors: ErrorList) {
+class IOProvider(fileName: String, private val errors: ErrorList) {
 
     private val reader = File(fileName).also {
         if (!it.exists())
             throw Exception("File with specified name does not exist.")
     }.bufferedReader()
 
-    var currentLine: String = reader.readLine()
+    private var currentLine: String = reader.readLine()
     var currentPosition = TextPosition(1, 1)
 
     private fun processNextChar(): Boolean {
@@ -42,7 +42,7 @@ class IOProvider(fileName: String, val errors: ErrorList) {
         else '\u0000'
     }
 
-    val columnWidth = 6
+    private val columnWidth = 6
 
     private fun listCurrentLine() {
         val lineNumberString = currentPosition.lineNumber.toString()
@@ -52,7 +52,7 @@ class IOProvider(fileName: String, val errors: ErrorList) {
         listErrors()
     }
 
-    var errorNumber = 1
+    private var errorNumber = 1
 
     private fun listErrors() {
         var error = errors.peekError()
