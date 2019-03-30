@@ -169,7 +169,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
         if (currentToken.type in starters) {
             while (currentToken.type == TokenType.FUNCTION) {
-                function_declaration(followers + TokenType.SEMICOLON)
+                function_declaration(followers + TokenType.SEMICOLON + TokenType.FUNCTION)
                 accept(TokenType.SEMICOLON)
             }
 
@@ -964,6 +964,10 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     private fun for_statement(followers: Set<TokenType>) {
         accept(TokenType.FOR)
         val forVariableType = variable()
+
+        if (forVariableType == ScopeManager.realType)
+            pushError(ErrorCode.INVALID_FOR_CONTROL_VARIABLE)
+
         accept(TokenType.ASSIGN_OPERATOR)
         val initialValueType = expression(followers + TokenType.TO + TokenType.DOWN_TO)
 

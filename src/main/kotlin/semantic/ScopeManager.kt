@@ -34,16 +34,17 @@ class ScopeManager {
     }
 
     fun openScope(function: FunctionIdentifier? = null) {
-        val scope = Scope()
+
+        scopes.push(Scope())
+
         function?.parameters?.filterNotNull()?.forEach { param ->
-            scope.addIdentifier(VariableIdentifier(param.name, param.type))
+            addIdentifier(VariableIdentifier(param.name, param.type))
         }
 
         function?.let {
-            scope.addIdentifier(VariableIdentifier(it.name, it.resultType))
+            addIdentifier(VariableIdentifier(it.name, it.resultType))
         }
 
-        scopes.push(scope)
     }
 
 
