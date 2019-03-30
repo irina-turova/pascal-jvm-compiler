@@ -14,7 +14,7 @@ class ConstantIdentifier(name: String, type: Type? = null): Identifier(name, typ
 class TypeIdentifier(name: String, type: Type? = null): Identifier(name, type)
 
 abstract class ExecutableIdentifier(name: String, type: Type? = null): Identifier(name, type) {
-    var parameters = listOf<Parameter?>()
+    var parameters = mutableListOf<Parameter?>()
     var isForward = false
 }
 

@@ -41,10 +41,6 @@ abstract class Type {
         }
     }
 
-    /*
-    val multiplyingOperators = setOf(TokenType.STAR, TokenType.SLASH, TokenType.DIV,
-        TokenType.MOD, TokenType.AND)
-     */
     fun multiplyingType(other: Type, operator: TokenType): Type? {
         return when {
             operator == TokenType.AND -> if (this == ScopeManager.booleanType && other == ScopeManager.booleanType) ScopeManager.booleanType else null
@@ -61,7 +57,9 @@ abstract class Type {
 
 class ProgramType: Type()
 
+class ProgramParameterType: Type()
+
 class ScalarType: Type()
 
-class EnumType: Type()
+class EnumType(constants: List<String>): Type()
 

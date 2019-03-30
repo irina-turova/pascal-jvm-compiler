@@ -3,9 +3,7 @@ package semantic
 import lexer.IdentifierToken
 import lexer.Token
 import semantic.identifiers.*
-import semantic.types.ProgramType
-import semantic.types.ScalarType
-import semantic.types.Type
+import semantic.types.*
 import java.util.*
 
 class ScopeManager {
@@ -18,12 +16,19 @@ class ScopeManager {
         scopes.push(Scope())
 
         addType(programType)
+        addType(programParameterType)
+
         addType(integerType)
         addIdentifier(TypeIdentifier("integer", integerType))
+
         addType(booleanType)
         addIdentifier(TypeIdentifier("boolean", booleanType))
+        addIdentifier(ConstantIdentifier("false", booleanType))
+        addIdentifier(ConstantIdentifier("true", booleanType))
+
         addType(realType)
         addIdentifier(TypeIdentifier("real", realType))
+
         addType(charType)
         addIdentifier(TypeIdentifier("char", charType))
     }
@@ -33,6 +38,11 @@ class ScopeManager {
         function?.parameters?.filterNotNull()?.forEach { param ->
             scope.addIdentifier(VariableIdentifier(param.name, param.type))
         }
+
+        function?.let {
+            scope.addIdentifier(VariableIdentifier(it.name, it.resultType))
+        }
+
         scopes.push(scope)
     }
 
@@ -43,7 +53,7 @@ class ScopeManager {
         if (token is IdentifierToken)
             VariableIdentifier(token.identifier).let {
                 variablesBuffer.add(it)
-                scopes.peek().addIdentifier(it)
+                addIdentifier(it)
             }
     }
 
@@ -96,8 +106,9 @@ class ScopeManager {
 
     companion object {
         val programType = ProgramType()
+        val programParameterType = ProgramParameterType()
         val integerType = ScalarType()
-        val booleanType = ScalarType()
+        val booleanType = EnumType(listOf("false", "true"))
         val realType = ScalarType()
         val charType = ScalarType()
     }

@@ -107,6 +107,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
             if (currentToken.type == TokenType.LEFT_BRACKET) {
                 accept(TokenType.LEFT_BRACKET)
                 identifier_list(followers + TokenType.RIGHT_BRACKET)
+                scopeManager.flushVariableBuffer(ScopeManager.programParameterType)
                 accept(TokenType.RIGHT_BRACKET)
             }
             accept(TokenType.SEMICOLON)
@@ -122,11 +123,20 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
         checkBeg(starters, followers)
 
         if (currentToken.type in starters) {
-            scopeManager.addVariableToBuffer(currentToken)
+            if (scopeManager.findLocalIdentifier(currentToken) != null)
+                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+            else
+                scopeManager.addVariableToBuffer(currentToken)
+
             accept(TokenType.IDENTIFIER)
             while (currentToken.type == TokenType.COMMA) {
                 accept(TokenType.COMMA)
-                scopeManager.addVariableToBuffer(currentToken)
+
+                if (scopeManager.findLocalIdentifier(currentToken) != null)
+                    pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+                else
+                    scopeManager.addVariableToBuffer(currentToken)
+
                 accept(TokenType.IDENTIFIER)
             }
             checkEnd(followers)
@@ -175,19 +185,19 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * formal-parameter-list = `(' formal-parameter-section { ` ;' formal-parameter-section } `)' .
      */
-    private fun formal_parameter_list(followers: Set<TokenType>): List<Parameter?> {
-
-        val parameters = mutableListOf<Parameter?>()
+    private fun formal_parameter_list(
+        followers: Set<TokenType>,
+        parameters: MutableList<Parameter?>
+    ) {
 
         accept(TokenType.LEFT_BRACKET)
-        parameters.addAll(formal_parameters_section(followers))
+        formal_parameters_section(followers, parameters)
         while (currentToken.type == TokenType.SEMICOLON) {
             accept(TokenType.SEMICOLON)
-            parameters.addAll(formal_parameters_section(followers))
+            formal_parameters_section(followers, parameters)
         }
         accept(TokenType.RIGHT_BRACKET)
 
-        return parameters
     }
 
     /**
@@ -247,7 +257,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
         accept(TokenType.IDENTIFIER)
 
         if (currentToken.type == TokenType.LEFT_BRACKET)
-            identifier.parameters = formal_parameter_list(followers)
+            formal_parameter_list(followers, identifier.parameters)
 
         accept(TokenType.COLON)
         identifier.resultType = type_identifier()
@@ -263,11 +273,11 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * | procedural-parameter-specification
      * | functional-parameter-specification .
      */
-    private fun formal_parameters_section(followers: Set<TokenType>): List<Parameter?> {
-        return when(currentToken.type) {
-            TokenType.IDENTIFIER -> value_parameter_section()
-            TokenType.VAR -> variable_parameter_section()
-            else -> {pushError(ErrorCode.UNEXPECTED_SYMBOL); listOf()}
+    private fun formal_parameters_section(followers: Set<TokenType>, parameters: MutableList<Parameter?>) {
+        when(currentToken.type) {
+            TokenType.IDENTIFIER -> value_parameter_section(parameters)
+            TokenType.VAR -> variable_parameter_section(parameters)
+            else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
         }
         // checkEnd(followers)
     }
@@ -275,38 +285,56 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     /**
      * variable-parameter-section = var identifier-list ":" parameter-type
      */
-    private fun variable_parameter_section(): List<Parameter?> {
+    private fun variable_parameter_section(parameters: MutableList<Parameter?>) {
         accept(TokenType.VAR)
-        return parameter_group().apply { forEach { it?.mode = TransmissionMode.VARIABLE } }
+        parameter_group(parameters, TransmissionMode.VARIABLE)
     }
 
     /**
      * value-parameter-section = identifier-list ":" parameter-type
      */
-    private fun value_parameter_section(): List<Parameter?> {
-        return parameter_group()
+    private fun value_parameter_section(parameters: MutableList<Parameter?>) {
+        parameter_group(parameters, TransmissionMode.VALUE)
     }
 
     /**
      * <parameter group> ::= <identifier> {, <identifier>} : <type identifier>
      */
-    private fun parameter_group(): List<Parameter?> {
+    private fun parameter_group(parameters: MutableList<Parameter?>, transmissionMode: TransmissionMode) {
 
-        val parameters = mutableListOf<Parameter?>()
+        val tempParameters = mutableListOf<Parameter?>()
 
-        parameters.add((currentToken as? IdentifierToken)?.let { Parameter(it.identifier, null, TransmissionMode.VALUE) })
+        (currentToken as? IdentifierToken)?.let { token ->
+            if (parameters.any { it?.name == token.identifier }) {
+                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+                parameters.add(null)
+            } else {
+                parameters.add(Parameter(token.identifier, null, transmissionMode))
+                tempParameters.add(parameters.last())
+            }
+        }
+
         accept(TokenType.IDENTIFIER)
         while (currentToken.type == TokenType.COMMA) {
             accept(TokenType.COMMA)
-            parameters.add((currentToken as? IdentifierToken)?.let { Parameter(it.identifier, null, TransmissionMode.VALUE) })
+
+            (currentToken as? IdentifierToken)?.let { token ->
+                if (parameters.any { it?.name == token.identifier }) {
+                    pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+                    parameters.add(null)
+                } else {
+                    parameters.add(Parameter(token.identifier, null, transmissionMode))
+                    tempParameters.add(parameters.last())
+                }
+            }
+
             accept(TokenType.IDENTIFIER)
         }
         accept(TokenType.COLON)
         val parametersType = type_identifier()
-        parameters.forEach {
+        tempParameters.forEach {
             it?.type = parametersType
         }
-        return parameters
     }
 
     /**
@@ -770,15 +798,24 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     private fun actual_parameter_list(followers: Set<TokenType>, requiredParameters: List<Parameter?>) {
 
         val neededParameters = requiredParameters.toMutableList()
+        var parameterNumberErrorOccured = false
 
         accept(TokenType.LEFT_BRACKET)
         actual_parameter(followers + TokenType.COMMA + TokenType.RIGHT_BRACKET, neededParameters.firstOrNull())
-        neededParameters.removeAt(0)
+        if (neededParameters.isEmpty() && !parameterNumberErrorOccured) {
+            pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
+            parameterNumberErrorOccured = true
+        } else
+            neededParameters.removeAt(0)
 
         while (currentToken.type == TokenType.COMMA) {
             accept(TokenType.COMMA)
             actual_parameter(followers + TokenType.COMMA + TokenType.RIGHT_BRACKET, neededParameters.firstOrNull())
-            neededParameters.removeAt(0)
+            if (neededParameters.isEmpty() && !parameterNumberErrorOccured) {
+                pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
+                parameterNumberErrorOccured = true
+            } else
+                neededParameters.removeAt(0)
         }
         accept(TokenType.RIGHT_BRACKET)
 
