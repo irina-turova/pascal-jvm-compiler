@@ -73,7 +73,7 @@ class ScopeManager {
         return null
     }
 
-    fun findLocalForwards(): List<ExecutableIdentifier> {
+    fun findLocalForwards(): List<FunctionIdentifier> {
         return scopes.peek().findForwards()
     }
 

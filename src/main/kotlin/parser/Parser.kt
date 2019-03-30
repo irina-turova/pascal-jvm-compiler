@@ -192,10 +192,10 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     ) {
 
         accept(TokenType.LEFT_BRACKET)
-        formal_parameters_section(followers, parameters)
+        formal_parameters_section(parameters)
         while (currentToken.type == TokenType.SEMICOLON) {
             accept(TokenType.SEMICOLON)
-            formal_parameters_section(followers, parameters)
+            formal_parameters_section(parameters)
         }
         accept(TokenType.RIGHT_BRACKET)
 
@@ -273,13 +273,12 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * | procedural-parameter-specification
      * | functional-parameter-specification .
      */
-    private fun formal_parameters_section(followers: Set<TokenType>, parameters: MutableList<Parameter?>) {
+    private fun formal_parameters_section(parameters: MutableList<Parameter?>) {
         when(currentToken.type) {
             TokenType.IDENTIFIER -> value_parameter_section(parameters)
             TokenType.VAR -> variable_parameter_section(parameters)
             else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
         }
-        // checkEnd(followers)
     }
 
     /**

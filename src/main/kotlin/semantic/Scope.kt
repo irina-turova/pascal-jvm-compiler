@@ -1,6 +1,6 @@
 package semantic
 
-import semantic.identifiers.ExecutableIdentifier
+import semantic.identifiers.FunctionIdentifier
 import semantic.identifiers.Identifier
 import semantic.identifiers.IdentifierTable
 import semantic.types.Type
@@ -23,7 +23,7 @@ class Scope {
         types.add(type)
     }
 
-    fun findForwards(): List<ExecutableIdentifier> {
+    fun findForwards(): List<FunctionIdentifier> {
         return identifiers.findForwards()
     }
 }

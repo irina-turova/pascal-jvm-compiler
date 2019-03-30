@@ -13,11 +13,8 @@ class ConstantIdentifier(name: String, type: Type? = null): Identifier(name, typ
 
 class TypeIdentifier(name: String, type: Type? = null): Identifier(name, type)
 
-abstract class ExecutableIdentifier(name: String, type: Type? = null): Identifier(name, type) {
+class FunctionIdentifier(name: String, type: Type? = null): Identifier(name, type) {
     var parameters = mutableListOf<Parameter?>()
     var isForward = false
-}
-
-class FunctionIdentifier(name: String, type: Type? = null): ExecutableIdentifier(name, type) {
     var resultType: Type? = null
 }
