@@ -126,14 +126,19 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
             }
             '*' -> {
                 io.takeNextChar()
-                if (io.nextChar() == ')')
-                    Token(TokenType.END_COMMENT_STAR, tokenPosition).also { io.takeNextChar() }
-                else
-                    Token(TokenType.STAR, tokenPosition)
+                Token(TokenType.STAR, tokenPosition)
             }
             '/' -> {
                 io.takeNextChar()
-                Token(TokenType.SLASH, tokenPosition)
+                if (io.nextChar() == '/') {
+                    while (io.nextChar() != '\n')
+                        io.takeNextChar()
+                    while (io.nextChar().isWhitespace())
+                        io.takeNextChar()
+
+                    scanSymbol()
+                } else
+                    Token(TokenType.SLASH, tokenPosition)
             }
             '=' -> {
                 io.takeNextChar()
@@ -141,9 +146,17 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
             }
             '(' -> {
                 io.takeNextChar()
-                if (io.nextChar() == '*')
-                    Token(TokenType.START_COMMENT_STAR, tokenPosition).also { io.takeNextChar() }
-                else
+                if (io.nextChar() == '*') {
+                    io.takeNextChar()
+                    var prevChar = io.takeNextChar()
+                    while (!(prevChar == '*'  && io.nextChar() == ')') && io.nextChar() != '\u0000')
+                        prevChar = io.takeNextChar()
+                    if (io.nextChar() != '\u0000')
+                        io.takeNextChar()
+                    while (io.nextChar().isWhitespace())
+                        io.takeNextChar()
+                    scanSymbol()
+                } else
                     Token(TokenType.LEFT_BRACKET, tokenPosition)
             }
             ')' -> {
@@ -152,7 +165,14 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
             }
             '{' -> {
                 io.takeNextChar()
-                Token(TokenType.LEFT_CURLY_BRACKET, tokenPosition)
+                while (io.nextChar() != '}' && io.nextChar() != '\u0000')
+                    io.takeNextChar()
+                if (io.nextChar() != '\u0000')
+                    io.takeNextChar()
+                while (io.nextChar().isWhitespace())
+                    io.takeNextChar()
+
+                scanSymbol()
             }
             '}' -> {
                 io.takeNextChar()
@@ -179,7 +199,7 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
     }
 
     fun nextSymbol(): Token {
-        while (io.nextChar() == ' ')
+        while (io.nextChar().isWhitespace())
             io.takeNextChar()
 
         tokenPosition = io.currentPosition.copy()

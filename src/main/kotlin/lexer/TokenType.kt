@@ -7,7 +7,6 @@ enum class TokenType {
 
     INT_CONSTANT,
     DOUBLE_CONSTANT,
-    // STRING_CONSTANT,
     CHAR_CONSTANT,
 
     COMMA,
@@ -42,6 +41,7 @@ enum class TokenType {
     PROGRAM,
     TYPE,
     VAR,
+    FUNCTION,
     BEGIN,
     END,
     IF,
@@ -56,9 +56,6 @@ enum class TokenType {
     REPEAT,
     UNTIL,
 
-    START_COMMENT_STAR,
-    END_COMMENT_STAR,
-
     LEFT_BRACKET,
     RIGHT_BRACKET,
     LEFT_CURLY_BRACKET,
@@ -67,6 +64,4 @@ enum class TokenType {
     RIGHT_SQUARE_BRACKET,
 
     THIS_IS_THE_END,
-
-    FUNCTION
 }

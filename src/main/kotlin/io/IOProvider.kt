@@ -19,7 +19,7 @@ class IOProvider(fileName: String, val errors: ErrorList) {
             if (currentLine != "\u0000")
                 listCurrentLine()
             if (reader.ready())
-                currentLine = reader.readLine().replace("\t", " ".repeat(4)) + " "
+                currentLine = reader.readLine().replace("\t", " ".repeat(4)).plus("\n")
             else {
                 currentLine = "\u0000"
                 return false
@@ -47,7 +47,7 @@ class IOProvider(fileName: String, val errors: ErrorList) {
         val columnWidth = 6
         val lineNumberString = currentPosition.lineNumber.toString()
         val lineNumPadEnd = (columnWidth - lineNumberString.length) / 2
-        println("${lineNumberString.padStart(columnWidth - lineNumPadEnd).padEnd(columnWidth)} $currentLine")
+        print("${lineNumberString.padStart(columnWidth - lineNumPadEnd).padEnd(columnWidth)} $currentLine")
 
         var error = errors.peekError()
         while (error != null) {
