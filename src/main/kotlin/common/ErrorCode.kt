@@ -155,7 +155,7 @@ enum class ErrorCode(val code: Int) {
         106 to "Character expression expected - Предшествующее выражение должно иметь символьный тип",
         107 to "Too many relocation items - Слишком много перемещаемых Элементов",
         108 to "Overflow in arithmetic operator - Переполнение при выполнении арифметического оператора",
-        109 to "No enclosing FOR to WHILE or REPEAT statment - Нет операторов to заканчивающих операторы FOR to WHILE или REPEAT",
+        109 to "No enclosing FOR to WHILE or REPEAT statement - Нет операторов to заканчивающих операторы FOR to WHILE или REPEAT",
         110 to "Debug information table overflow - Переполнение информационной таблицы отладки",
         111 to "- - -",
         112 to "CASE constant out of range - Константа CASE нарушает допустимые границы",

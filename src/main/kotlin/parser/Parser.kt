@@ -746,7 +746,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
                     TokenType.INT_CONSTANT,
                     TokenType.DOUBLE_CONSTANT,
                     TokenType.CHAR_CONSTANT
-                ) -> resultType = unsingned_constant()
+                ) -> resultType = unsigned_constant()
                 currentToken.type == TokenType.LEFT_BRACKET -> {
                     accept(TokenType.LEFT_BRACKET)
                     resultType = expression(followers + TokenType.RIGHT_BRACKET)
@@ -793,22 +793,22 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     private fun actual_parameter_list(followers: Set<TokenType>, requiredParameters: List<Parameter?>) {
 
         val neededParameters = requiredParameters.toMutableList()
-        var parameterNumberErrorOccured = false
+        var parameterNumberErrorOccurred = false
 
         accept(TokenType.LEFT_BRACKET)
         actual_parameter(followers + TokenType.COMMA + TokenType.RIGHT_BRACKET, neededParameters.firstOrNull())
-        if (neededParameters.isEmpty() && !parameterNumberErrorOccured) {
+        if (neededParameters.isEmpty() && !parameterNumberErrorOccurred) {
             pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
-            parameterNumberErrorOccured = true
+            parameterNumberErrorOccurred = true
         } else
             neededParameters.removeAt(0)
 
         while (currentToken.type == TokenType.COMMA) {
             accept(TokenType.COMMA)
             actual_parameter(followers + TokenType.COMMA + TokenType.RIGHT_BRACKET, neededParameters.firstOrNull())
-            if (neededParameters.isEmpty() && !parameterNumberErrorOccured) {
+            if (neededParameters.isEmpty() && !parameterNumberErrorOccurred) {
                 pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
-                parameterNumberErrorOccured = true
+                parameterNumberErrorOccurred = true
             } else
                 neededParameters.removeAt(0)
         }
@@ -856,7 +856,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
      * no neutralization needed
      * <unsigned constant> ::= <unsigned number> | <string> | < constant identifier> < nil>
      */
-    private fun unsingned_constant(): Type? {
+    private fun unsigned_constant(): Type? {
 
         val resultType: Type?
         when {
@@ -910,7 +910,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
     /**
      * no before neutralization needed
-     * <repetitive statement> ::= <while statement> | <repeat statemant> | <for statement>
+     * <repetitive statement> ::= <while statement> | <repeat statement> | <for statement>
      */
     private fun repetitive_statement(followers: Set<TokenType>) {
         when (currentToken.type) {
