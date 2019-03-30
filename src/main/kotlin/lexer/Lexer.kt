@@ -206,4 +206,8 @@ class Lexer(private val io: IOProvider, val errors: ErrorList) {
         return scanSymbol()
     }
 
+    fun flush() {
+        io.flush()
+    }
+
 }

@@ -54,6 +54,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
     fun parse() {
         program(setOf(TokenType.THIS_IS_THE_END))
+        lexer.flush()
     }
 
     private fun accept(expectedToken: TokenType) {
@@ -444,11 +445,11 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
     private fun type_identifier(): Type? {
         val identifier = scopeManager.findIdentifier(currentToken)
         accept(TokenType.IDENTIFIER)
-        if (identifier == null || identifier !is TypeIdentifier) {
+        return if (identifier == null || identifier !is TypeIdentifier) {
             pushError(ErrorCode.TYPE_IDENTIFIER_EXPECTED)
-            return null
+            null
         } else
-            return identifier.type
+            identifier.type
     }
 
     /**
@@ -508,13 +509,8 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
         if (currentToken.type in starters) {
             when {
                 currentToken.type == TokenType.IDENTIFIER -> simple_statement(followers)
-                currentToken.type in setOf(
-                    TokenType.BEGIN,
-                    TokenType.IF,
-                    TokenType.WHILE,
-                    TokenType.REPEAT,
-                    TokenType.FOR
-                ) -> structured_statement(followers)
+                currentToken.type in setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE, TokenType.REPEAT,
+                    TokenType.FOR) -> structured_statement(followers)
                 else -> pushError(ErrorCode.IDENTIFIER_EXPECTED) // TODO: check if it's ok
             }
             checkEnd(followers)
@@ -529,12 +525,11 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
 
         if (currentToken.type in simpleStatementStarters) {
             val identifier = scopeManager.findIdentifier(currentToken)
-            if (identifier is VariableIdentifier)
-                assignment_statement(followers)
-            else if (identifier is FunctionIdentifier) {
-                function_designator(followers)
-            } else
-                pushError(ErrorCode.IDENTIFIER_EXPECTED)
+            when (identifier) {
+                is VariableIdentifier -> assignment_statement(followers)
+                is FunctionIdentifier -> function_designator(followers)
+                else -> pushError(ErrorCode.IDENTIFIER_EXPECTED)
+            }
 
             checkEnd(followers)
         }
@@ -651,7 +646,7 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
                 resultType = term(followers + addingOperators)
 
                 if (resultType != null && !resultType.isSignable())
-                    pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
+                    pushError(ErrorCode.INTEGER_OR_REAL_EXPRESSION_EXPECTED)
             } else if (currentToken.type in setOf(
                     TokenType.IDENTIFIER, TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT,
                     TokenType.LEFT_BRACKET, TokenType.NOT
@@ -761,10 +756,10 @@ class Parser(val lexer: Lexer, val errors: ErrorList, val scopeManager: ScopeMan
                     accept(TokenType.NOT)
                     resultType = factor(followers)
                     if (resultType != null && !resultType.isLogical())
-                        pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR)
+                        pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
                 }
                 else -> {
-                    pushError(ErrorCode.VARIABLE_IDENTIFIER_EXPECTED) // ?
+                    pushError(ErrorCode.IDENTIFIER_EXPECTED) // ?
                     resultType = null
                 }
             }

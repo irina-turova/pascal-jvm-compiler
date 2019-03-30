@@ -18,11 +18,5 @@ object Compiler {
         val io = IOProvider(args[0], errorList)
         val lexer = Lexer(io, errorList)
         Parser(lexer, errorList, ScopeManager()).parse()
-
-        var error = errorList.peekError()
-        while (error != null) {
-            println("**NO** " + " ".repeat(error.textPosition.charNumber) + " ошибка: ${error.errorCode.errorText()}")
-            error = errorList.peekError()
-        }
     }
 }
