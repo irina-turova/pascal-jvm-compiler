@@ -31,9 +31,10 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     }
 
     private fun skipTo(vararg tokens: Set<TokenType>) {
+        print("Skipping: ")
         val united = tokens.fold(setOf(TokenType.THIS_IS_THE_END)) { a, b -> a union b}
         while (currentToken.type !in united) {
-            println("Skipping $currentToken")
+            println("\t$currentToken")
             currentToken = getNextSymbol()
         }
     }
@@ -41,6 +42,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     private fun checkBeg(starters: Set<TokenType>, followers: Set<TokenType>) {
         if (currentToken.type !in starters) {
             pushError(ErrorCode.UNEXPECTED_SYMBOL)
+            println("Now we will skip because of:")
+            Exception().printStackTrace(System.out)
             skipTo(starters, followers)
         }
     }
@@ -48,6 +51,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     private fun checkEnd(followers: Set<TokenType>, error: ErrorCode? = null) {
         if (currentToken.type !in followers) {
             pushError(ErrorCode.UNEXPECTED_SYMBOL)
+            println("Now we will skip because of:")
+            Exception().printStackTrace(System.out)
             skipTo(followers)
         }
     }
@@ -522,11 +527,11 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         checkBeg(simpleStatementStarters, followers)
 
         if (currentToken.type in simpleStatementStarters) {
-            val identifier = scopeManager.findIdentifier(currentToken)
-            when (identifier) {
-                is VariableIdentifier -> assignment_statement(followers)
-                is FunctionIdentifier -> function_designator(followers)
-                else -> pushError(ErrorCode.IDENTIFIER_EXPECTED)
+            val identifierName = (currentToken as IdentifierToken).identifier
+            accept(TokenType.IDENTIFIER)
+            when (currentToken.type) {
+                TokenType.ASSIGN_OPERATOR -> assignment_statement(followers, identifierName)
+                else -> function_designator(followers, identifierName)
             }
 
             checkEnd(followers)
@@ -536,26 +541,30 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     /**
      * <assignment statement> ::= <variable> := <expression> | <function identifier> := <expression>
      */
-    private fun assignment_statement(followers: Set<TokenType>) {
-        val starters = setOf(TokenType.IDENTIFIER)
+    private fun assignment_statement(followers: Set<TokenType>, identifierName: String) {
+        val starters = setOf(TokenType.ASSIGN_OPERATOR)
         checkBeg(starters, followers)
 
         if (currentToken.type in starters) {
 
-            val identifier = scopeManager.findIdentifier(currentToken)
+            val identifier = scopeManager.findIdentifier(identifierName)
 
             if (identifier == null)
                 pushError(ErrorCode.UNKNOWN_IDENTIFIER)
             else if (identifier !is VariableIdentifier)
                 pushError(ErrorCode.VARIABLE_IDENTIFIER_EXPECTED)
 
-            accept(TokenType.IDENTIFIER)
+            // accept(TokenType.IDENTIFIER)
             accept(TokenType.ASSIGN_OPERATOR)
             val expressionType = expression(followers)
 
             val identifierType = identifier?.type
             if (identifierType != null && expressionType != null && !identifierType.isCompatibleTo(expressionType))
                 pushError(ErrorCode.ILLEGAL_ASSIGNMENT)
+
+            if (identifier == null) {
+                scopeManager.addIdentifier(VariableIdentifier(identifierName, expressionType))
+            }
 
             checkEnd(followers)
         }
@@ -729,15 +738,25 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
 
             when {
                 currentToken.type == TokenType.IDENTIFIER -> {
+                    val identifierName = (currentToken as IdentifierToken).identifier
                     val identifier = scopeManager.findIdentifier(currentToken)
                     when (identifier) {
                         is VariableIdentifier -> resultType = variable()
                         is ConstantIdentifier -> {
                             resultType = identifier.type; currentToken = getNextSymbol()
                         }
-                        is FunctionIdentifier -> resultType = function_designator(followers)
+                        is FunctionIdentifier -> {
+                            accept(TokenType.IDENTIFIER)
+                            resultType = function_designator(followers, identifierName)
+                        }
                         else -> {
-                            pushError(ErrorCode.IDENTIFIER_EXPECTED)
+                            accept(TokenType.IDENTIFIER)
+                            if (currentToken.type == TokenType.LEFT_BRACKET)
+                                function_designator(followers, identifierName)
+                            else {
+                                pushError(ErrorCode.UNKNOWN_IDENTIFIER)
+                                scopeManager.addIdentifier(VariableIdentifier(identifierName))
+                            }
                             resultType = null
                         }
                     }
@@ -773,13 +792,21 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * no before neutralization needed
      * function-designator = function-identifier [ actual-parameter-list ] .
      */
-    private fun function_designator(followers: Set<TokenType>): Type? {
-        val identifier = scopeManager.findIdentifier(currentToken) as FunctionIdentifier
-        val resultType = identifier.resultType
-        accept(TokenType.IDENTIFIER)
+    private fun function_designator(followers: Set<TokenType>, identifierName: String): Type? {
+        var identifier = scopeManager.findIdentifier(identifierName)
+
+        if (identifier == null) {
+            pushError(ErrorCode.UNKNOWN_IDENTIFIER)
+            identifier = FunctionIdentifier(identifierName)
+            scopeManager.addIdentifier(identifier)
+        } else if (identifier !is FunctionIdentifier)
+            pushError(ErrorCode.PROCEDURE_OR_FUNCTION_VARIABLE_EXPECTED)
+
+        val resultType = (identifier as? FunctionIdentifier)?.resultType
+
         if (currentToken.type == TokenType.LEFT_BRACKET)
-            actual_parameter_list(followers, identifier.parameters)
-        else if (identifier.parameters.isNotEmpty())
+            actual_parameter_list(followers, (identifier as? FunctionIdentifier)?.parameters ?: listOf())
+        else if ((identifier as? FunctionIdentifier)?.parameters?.isNotEmpty() == true)
             pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
 
         checkEnd(followers)
@@ -809,7 +836,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             if (neededParameters.isEmpty() && !parameterNumberErrorOccurred) {
                 pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
                 parameterNumberErrorOccurred = true
-            } else
+            } else if (neededParameters.isNotEmpty())
                 neededParameters.removeAt(0)
         }
         accept(TokenType.RIGHT_BRACKET)
@@ -886,7 +913,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     private val multiplyingOperators = setOf(TokenType.STAR, TokenType.SLASH, TokenType.DIV,
         TokenType.MOD, TokenType.AND)
     private fun multiplying_operator() {
-        for (opToken in relationalOperators)
+        for (opToken in multiplyingOperators)
             if (currentToken.type == opToken) {
                 accept(opToken)
                 return

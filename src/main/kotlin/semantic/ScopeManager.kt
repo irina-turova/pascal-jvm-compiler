@@ -80,12 +80,21 @@ class ScopeManager {
     fun findIdentifier(token: Token): Identifier? {
         if (token !is IdentifierToken)
             return null
-        for (scope in scopes.elements().toList().reversed()) { // !! check elements order
+        for (scope in scopes.elements().toList().reversed()) {
             scope.findIdentifier(token.identifier)?.let {
                 return it
             }
         }
 
+        return null
+    }
+
+    fun findIdentifier(identifierName: String): Identifier? {
+        for (scope in scopes.elements().toList().reversed()) {
+            scope.findIdentifier(identifierName)?.let {
+                return it
+            }
+        }
         return null
     }
 

@@ -11,7 +11,9 @@ class IOProvider(fileName: String, private val errors: ErrorList) {
             throw Exception("File with specified name does not exist.")
     }.bufferedReader()
 
-    private var currentLine: String = reader.readLine()
+    private val writer = File("$fileName.listing").bufferedWriter()
+
+    private var currentLine: String = reader.readLine().replace("\t", " ".repeat(4)).plus("\n")
     var currentPosition = TextPosition(1, 1)
 
     private fun processNextChar(): Boolean {
@@ -42,12 +44,15 @@ class IOProvider(fileName: String, private val errors: ErrorList) {
         else '\u0000'
     }
 
-    private val columnWidth = 6
+    private val columnWidth = 8
 
     private fun listCurrentLine() {
         val lineNumberString = currentPosition.lineNumber.toString()
         val lineNumPadEnd = (columnWidth - lineNumberString.length) / 2
-        print("${lineNumberString.padStart(columnWidth - lineNumPadEnd).padEnd(columnWidth)} $currentLine")
+        ("${lineNumberString.padStart(columnWidth - lineNumPadEnd).padEnd(columnWidth)} $currentLine").also {
+            print(it)
+            writer.write(it)
+        }
 
         listErrors()
     }
@@ -59,14 +64,19 @@ class IOProvider(fileName: String, private val errors: ErrorList) {
         while (error != null) {
             val errorNumberString = (errorNumber++).toString()
             val errorNumPadEnd = (columnWidth - errorNumberString.length) / 2
-            println(errorNumberString.padStart(columnWidth - errorNumPadEnd, '*').padEnd(columnWidth, '*') +
-                    " ".repeat(error.textPosition.charNumber - 1) + "^ ошибка: ${error.errorCode.errorText()}")
+            (errorNumberString.padStart(columnWidth - errorNumPadEnd, '*').padEnd(columnWidth, '*') +
+                    " ".repeat(error.textPosition.charNumber - 1) + "^ ошибка: ${error.errorCode.errorText()}").also {
+                println(it)
+                writer.write(it)
+                writer.newLine()
+            }
             error = errors.peekError()
         }
     }
 
     fun flush() {
         listErrors()
+        writer.flush()
     }
 
 }
