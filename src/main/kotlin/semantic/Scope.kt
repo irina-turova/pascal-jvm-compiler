@@ -1,6 +1,5 @@
 package semantic
 
-import semantic.identifiers.FunctionIdentifier
 import semantic.identifiers.Identifier
 import semantic.identifiers.IdentifierTable
 import semantic.types.Type
@@ -21,9 +20,5 @@ class Scope {
 
     fun addType(type: Type) {
         types.add(type)
-    }
-
-    fun findForwards(): List<FunctionIdentifier> {
-        return identifiers.findForwards()
     }
 }

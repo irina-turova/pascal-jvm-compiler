@@ -1,3 +1,21 @@
+program p1; // Find time difference in minutes
+var
+    hours1, minutes1, hours2, minutes2:integer;
+    allMinutes1, allMinutes2, result: integer;
+begin
+    hours1:=15;
+    minutes1:=25;
+
+    hours2:=15;
+    minutes2:=21;
+
+    allMinutes1 := hours1 * 60 + minutes1;
+    allMinutes2 := hours2 * 60 + minutes2;
+    result := allMinutes2 - allMinutes1
+
+    // writeln(result)
+end.
+
 {program p1;
 var
     a:integer;
@@ -67,7 +85,7 @@ begin
 
 end
 }
-   program example(a,c,v);
+{   program example(a,c,v);
    const min1=555;
          max1=666;
    type day=(Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday);
@@ -181,3 +199,5 @@ end
     Aaa:=(3*3-x*4/4)-3*(1+1)*(asd^[5,, gg*ddd[y^, gg=hh*ooo]])-(1);
     dfg+asdf;
     end.
+
+    }

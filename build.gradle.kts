@@ -17,6 +17,10 @@ repositories {
 
 dependencies {
     compile(kotlin("stdlib-jdk8"))
+    
+    // https://mvnrepository.com/artifact/org.ow2.asm/asm
+    compile(group="org.ow2.asm", name="asm", version="7.1")
+
 }
 
 tasks.withType<KotlinCompile> {

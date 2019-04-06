@@ -33,18 +33,9 @@ class ScopeManager {
         addIdentifier(TypeIdentifier("char", charType))
     }
 
-    fun openScope(function: FunctionIdentifier? = null) {
+    fun openScope() {
 
         scopes.push(Scope())
-
-        function?.parameters?.filterNotNull()?.forEach { param ->
-            addIdentifier(VariableIdentifier(param.name, param.type))
-        }
-
-        function?.let {
-            addIdentifier(VariableIdentifier(it.name, it.resultType))
-        }
-
     }
 
 
@@ -71,10 +62,6 @@ class ScopeManager {
         }
 
         return null
-    }
-
-    fun findLocalForwards(): List<FunctionIdentifier> {
-        return scopes.peek().findForwards()
     }
 
     fun findIdentifier(token: Token): Identifier? {

@@ -1,18 +1,18 @@
 package parser
 
-import lexer.TokenType
-import lexer.Token
-import lexer.Lexer
-import java.lang.Exception
-import common.ErrorList
-import common.ErrorCode
 import common.Error
+import common.ErrorCode
+import common.ErrorList
 import lexer.IdentifierToken
-import semantic.parameters.Parameter
+import lexer.Lexer
+import lexer.Token
+import lexer.TokenType
 import semantic.ScopeManager
-import semantic.parameters.TransmissionMode
+import semantic.identifiers.ConstantIdentifier
+import semantic.identifiers.ProgramIdentifier
+import semantic.identifiers.TypeIdentifier
+import semantic.identifiers.VariableIdentifier
 import semantic.types.Type
-import semantic.identifiers.*
 
 class Parser(private val lexer: Lexer, private val errors: ErrorList, private val scopeManager: ScopeManager) {
 
@@ -159,185 +159,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in blockStarters) {
             type_definition_part( followers union setOf(TokenType.VAR, TokenType.FUNCTION, TokenType.BEGIN))
             variable_declaration_part(followers union setOf(TokenType.FUNCTION, TokenType.BEGIN) )
-            procedure_and_function_declaration_part( followers union setOf(TokenType.BEGIN))
             statement_part(followers)
 
             checkEnd(followers)
-        }
-    }
-
-    /**
-     * <procedure and function declaration part> ::= {<procedure or function declaration > ;}
-     */
-    private fun procedure_and_function_declaration_part(followers: Set<TokenType>) {
-        val starters = setOf(TokenType.FUNCTION, TokenType.BEGIN)
-        checkBeg(starters, followers)
-
-        if (currentToken.type in starters) {
-            while (currentToken.type == TokenType.FUNCTION) {
-                function_declaration(followers + TokenType.SEMICOLON + TokenType.FUNCTION)
-                accept(TokenType.SEMICOLON)
-            }
-
-            scopeManager.findLocalForwards().forEach {
-                // TODO: Add explanation with func or proc name
-                pushError(ErrorCode.UNDEFINED_FORWARD)
-            }
-
-            checkEnd(followers)
-        }
-    }
-
-    /**
-     * formal-parameter-list = `(' formal-parameter-section { ` ;' formal-parameter-section } `)' .
-     */
-    private fun formal_parameter_list(
-        followers: Set<TokenType>,
-        parameters: MutableList<Parameter?>
-    ) {
-
-        accept(TokenType.LEFT_BRACKET)
-        formal_parameters_section(parameters)
-        while (currentToken.type == TokenType.SEMICOLON) {
-            accept(TokenType.SEMICOLON)
-            formal_parameters_section(parameters)
-        }
-        accept(TokenType.RIGHT_BRACKET)
-
-    }
-
-    /**
-     * function-declaration = function-heading ` ;' directive | function-identification ` ;' function-block
-     *      | function-heading ` ;' function-block .
-     *      
-     * we change to:
-     * function-declaration = `function` (function-heading ` ;' directive | function-identification ` ;' function-block
-     *      | function-heading ` ;' function-block )
-     */
-    private fun function_declaration(followers: Set<TokenType>) {
-
-        accept(TokenType.FUNCTION)
-
-        val identifier = scopeManager.findLocalIdentifier(currentToken)
-
-        if (identifier == null) {
-            val newIdentifier = function_heading(followers union blockStarters)
-                .also { scopeManager.addIdentifier(it) }
-            accept(TokenType.SEMICOLON)
-            currentToken.let {token ->
-                if (token is IdentifierToken &&  token.identifier.toLowerCase() == "forward") {
-                    accept(TokenType.IDENTIFIER)
-                    newIdentifier.isForward = true
-                } else {
-                    scopeManager.openScope(newIdentifier)
-                    block(followers)
-                    scopeManager.closeScope()
-                }
-            }
-        } else if (identifier is FunctionIdentifier && identifier.isForward) {
-            accept(TokenType.IDENTIFIER)
-            identifier.isForward = false
-            accept(TokenType.SEMICOLON)
-            scopeManager.openScope(identifier)
-            block(followers)
-            scopeManager.closeScope()
-        } else {
-            pushError(ErrorCode.DUPLICATE_IDENTIFIER)
-            checkEnd(followers)
-        }
-
-        checkEnd(followers)
-    }
-
-    /**
-     * function-heading = `function' identifier [ formal-parameter-list ] ':' result-type .
-     * 
-     * we change to:
-     * function-heading = identifier [ formal-parameter-list ] ':' result-type .
-     */
-    private fun function_heading(followers: Set<TokenType>): FunctionIdentifier {
-        val identifier = FunctionIdentifier((currentToken as IdentifierToken).identifier)
-        scopeManager.addIdentifier(identifier)
-
-        accept(TokenType.IDENTIFIER)
-
-        if (currentToken.type == TokenType.LEFT_BRACKET)
-            formal_parameter_list(followers, identifier.parameters)
-
-        accept(TokenType.COLON)
-        identifier.resultType = type_identifier()
-
-        checkEnd(followers)
-
-        return identifier
-    }
-
-    /**
-     * formal-parameter-section > value-parameter-specification
-     * | variable-parameter-specification
-     * | procedural-parameter-specification
-     * | functional-parameter-specification .
-     */
-    private fun formal_parameters_section(parameters: MutableList<Parameter?>) {
-        when(currentToken.type) {
-            TokenType.IDENTIFIER -> value_parameter_section(parameters)
-            TokenType.VAR -> variable_parameter_section(parameters)
-            else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
-        }
-    }
-
-    /**
-     * variable-parameter-section = var identifier-list ":" parameter-type
-     */
-    private fun variable_parameter_section(parameters: MutableList<Parameter?>) {
-        accept(TokenType.VAR)
-        parameter_group(parameters, TransmissionMode.VARIABLE)
-    }
-
-    /**
-     * value-parameter-section = identifier-list ":" parameter-type
-     */
-    private fun value_parameter_section(parameters: MutableList<Parameter?>) {
-        parameter_group(parameters, TransmissionMode.VALUE)
-    }
-
-    /**
-     * <parameter group> ::= <identifier> {, <identifier>} : <type identifier>
-     */
-    private fun parameter_group(parameters: MutableList<Parameter?>, transmissionMode: TransmissionMode) {
-
-        val tempParameters = mutableListOf<Parameter?>()
-
-        (currentToken as? IdentifierToken)?.let { token ->
-            if (parameters.any { it?.name == token.identifier }) {
-                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
-                parameters.add(null)
-            } else {
-                parameters.add(Parameter(token.identifier, null, transmissionMode))
-                tempParameters.add(parameters.last())
-            }
-        }
-
-        accept(TokenType.IDENTIFIER)
-        while (currentToken.type == TokenType.COMMA) {
-            accept(TokenType.COMMA)
-
-            (currentToken as? IdentifierToken)?.let { token ->
-                if (parameters.any { it?.name == token.identifier }) {
-                    pushError(ErrorCode.DUPLICATE_IDENTIFIER)
-                    parameters.add(null)
-                } else {
-                    parameters.add(Parameter(token.identifier, null, transmissionMode))
-                    tempParameters.add(parameters.last())
-                }
-            }
-
-            accept(TokenType.IDENTIFIER)
-        }
-        accept(TokenType.COLON)
-        val parametersType = type_identifier()
-        tempParameters.forEach {
-            it?.type = parametersType
         }
     }
 
@@ -531,7 +355,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             accept(TokenType.IDENTIFIER)
             when (currentToken.type) {
                 TokenType.ASSIGN_OPERATOR -> assignment_statement(followers, identifierName)
-                else -> function_designator(followers, identifierName)
+                else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
             }
 
             checkEnd(followers)
@@ -580,7 +404,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             when (currentToken.type) {
                 TokenType.BEGIN -> compound_statement(followers)
                 TokenType.IF -> conditional_statement(followers)
-                TokenType.WHILE, TokenType.REPEAT, TokenType.FOR -> repetitive_statement(followers)
+                TokenType.WHILE -> repetitive_statement(followers)
                 else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE, REPEAT, FOR")
             }
             checkEnd(followers)
@@ -745,18 +569,12 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                         is ConstantIdentifier -> {
                             resultType = identifier.type; currentToken = getNextSymbol()
                         }
-                        is FunctionIdentifier -> {
-                            accept(TokenType.IDENTIFIER)
-                            resultType = function_designator(followers, identifierName)
-                        }
                         else -> {
                             accept(TokenType.IDENTIFIER)
-                            if (currentToken.type == TokenType.LEFT_BRACKET)
-                                function_designator(followers, identifierName)
-                            else {
-                                pushError(ErrorCode.UNKNOWN_IDENTIFIER)
-                                scopeManager.addIdentifier(VariableIdentifier(identifierName))
-                            }
+
+                            pushError(ErrorCode.UNKNOWN_IDENTIFIER)
+                            scopeManager.addIdentifier(VariableIdentifier(identifierName))
+
                             resultType = null
                         }
                     }
@@ -786,87 +604,6 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         }
 
         return resultType
-    }
-
-    /**
-     * no before neutralization needed
-     * function-designator = function-identifier [ actual-parameter-list ] .
-     */
-    private fun function_designator(followers: Set<TokenType>, identifierName: String): Type? {
-        var identifier = scopeManager.findIdentifier(identifierName)
-
-        if (identifier == null) {
-            pushError(ErrorCode.UNKNOWN_IDENTIFIER)
-            identifier = FunctionIdentifier(identifierName)
-            scopeManager.addIdentifier(identifier)
-        } else if (identifier !is FunctionIdentifier)
-            pushError(ErrorCode.PROCEDURE_OR_FUNCTION_VARIABLE_EXPECTED)
-
-        val resultType = (identifier as? FunctionIdentifier)?.resultType
-
-        if (currentToken.type == TokenType.LEFT_BRACKET)
-            actual_parameter_list(followers, (identifier as? FunctionIdentifier)?.parameters ?: listOf())
-        else if ((identifier as? FunctionIdentifier)?.parameters?.isNotEmpty() == true)
-            pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
-
-        checkEnd(followers)
-        return resultType
-    }
-
-    /**
-     * no neutralization needed
-     * actual-parameter-list = `(' actual-parameter { `,' actual-parameter } `)' .
-     */
-    private fun actual_parameter_list(followers: Set<TokenType>, requiredParameters: List<Parameter?>) {
-
-        val neededParameters = requiredParameters.toMutableList()
-        var parameterNumberErrorOccurred = false
-
-        accept(TokenType.LEFT_BRACKET)
-        actual_parameter(followers + TokenType.COMMA + TokenType.RIGHT_BRACKET, neededParameters.firstOrNull())
-        if (neededParameters.isEmpty() && !parameterNumberErrorOccurred) {
-            pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
-            parameterNumberErrorOccurred = true
-        } else
-            neededParameters.removeAt(0)
-
-        while (currentToken.type == TokenType.COMMA) {
-            accept(TokenType.COMMA)
-            actual_parameter(followers + TokenType.COMMA + TokenType.RIGHT_BRACKET, neededParameters.firstOrNull())
-            if (neededParameters.isEmpty() && !parameterNumberErrorOccurred) {
-                pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
-                parameterNumberErrorOccurred = true
-            } else if (neededParameters.isNotEmpty())
-                neededParameters.removeAt(0)
-        }
-        accept(TokenType.RIGHT_BRACKET)
-
-        if (neededParameters.isNotEmpty())
-            pushError(ErrorCode.WRONG_NUMBER_OF_PARAMETERS)
-
-        checkEnd(followers)
-    }
-
-    /**
-     * no neutralization needed
-     * actual-parameter = expression | variable-access | procedure-identifier | function-identifier .
-     */
-    private fun actual_parameter(followers: Set<TokenType>, neededParameter: Parameter?) {
-        val starters = simpleExpressionStarters
-        checkBeg(starters, followers)
-
-        if (currentToken.type in starters) {
-            when {
-                neededParameter == null -> expression(followers)
-                neededParameter.mode == TransmissionMode.VALUE -> expression(followers)
-                neededParameter.mode == TransmissionMode.VARIABLE -> variable()
-                else -> null
-            }?.let { type ->
-                if (neededParameter?.type?.isCompatibleTo(type) == false)
-                    pushError(ErrorCode.TYPE_MISMATCH)
-            }
-            checkEnd(followers)
-        }
     }
 
     /**
@@ -940,13 +677,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * <repetitive statement> ::= <while statement> | <repeat statement> | <for statement>
      */
     private fun repetitive_statement(followers: Set<TokenType>) {
-        when (currentToken.type) {
-            TokenType.WHILE -> while_statement(followers)
-            TokenType.REPEAT -> repeat_statement(followers)
-            TokenType.FOR -> for_statement(followers)
-            else -> throw Exception("Unexpected error - here MUST be one of WHILE, REPEAT, FOR")
-        }
-        checkEnd(followers)
+        while_statement(followers)
     }
 
     /**
@@ -962,51 +693,4 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         statement(followers)
     }
 
-    /**
-     * no before neutralization needed
-     * repeat-statement = `repeat' statement-sequence `until' Boolean-expression
-     */
-    private fun repeat_statement(followers: Set<TokenType>) {
-        accept(TokenType.REPEAT)
-        statement_sequence(followers + TokenType.UNTIL)
-        accept(TokenType.UNTIL)
-        val expressionType = expression(followers)
-
-        if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
-            pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
-    }
-
-    /**
-     * no before neutralization needed
-     * for-statement = `for' control-variable ` :=' initial-value ( `to' | `downto' ) final-value `do' statement .
-     * control-variable = entire-variable .
-     * initial-value = expression .
-     * final-value = expression .
-     */
-    private fun for_statement(followers: Set<TokenType>) {
-        accept(TokenType.FOR)
-        val forVariableType = variable()
-
-        if (forVariableType == ScopeManager.realType)
-            pushError(ErrorCode.INVALID_FOR_CONTROL_VARIABLE)
-
-        accept(TokenType.ASSIGN_OPERATOR)
-        val initialValueType = expression(followers + TokenType.TO + TokenType.DOWN_TO)
-
-        if (forVariableType != null && initialValueType != null && !forVariableType.isCompatibleTo(initialValueType))
-            pushError(ErrorCode.INVALID_FOR_CONTROL_VARIABLE)
-
-        when (currentToken.type) {
-            TokenType.TO -> accept(TokenType.TO)
-            TokenType.DOWN_TO -> accept(TokenType.DOWN_TO)
-            else -> pushError(ErrorCode.TO_OR_DOWNTO_EXPECTED)
-        }
-        val finalValueType = expression(followers + TokenType.DO)
-
-        if (forVariableType != null && finalValueType != null && !forVariableType.isCompatibleTo(finalValueType))
-            pushError(ErrorCode.INVALID_FOR_CONTROL_VARIABLE)
-
-        accept(TokenType.DO)
-        statement(followers)
-    }
 }
