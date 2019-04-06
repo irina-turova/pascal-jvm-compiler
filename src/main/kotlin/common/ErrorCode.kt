@@ -223,14 +223,14 @@ enum class ErrorCode(private val code: Int) {
             TokenType.IDENTIFIER to IDENTIFIER_EXPECTED,
             TokenType.BEGIN to BEGIN_EXPECTED,
             TokenType.END to END_EXPECTED,
-            TokenType.DO to DO_EXPECTED,
-            TokenType.THEN to THEN_EXPECTED,
+//            TokenType.DO to DO_EXPECTED,
+//            TokenType.THEN to THEN_EXPECTED,
             TokenType.SEMICOLON to SEMICOLON_EXPECTED,
             TokenType.COLON to COLON_EXPECTED,
-            TokenType.TO to TO_EXPECTED, // ?
+            //TokenType.TO to TO_EXPECTED, // ?
             TokenType.LEFT_BRACKET to LEFT_BRACKET_EXPECTED,
             TokenType.RIGHT_BRACKET to RIGHT_BRACKET_EXPECTED,
-            TokenType.EQUAL_OPERATOR to EQUAL_OPERATOR_EXPECTED,
+            //TokenType.EQUAL_OPERATOR to EQUAL_OPERATOR_EXPECTED,
             TokenType.ASSIGN_OPERATOR to ASSIGN_OPERATOR_EXPECTED,
             TokenType.DOT to DOT_EXPECTED,
             TokenType.DOT_DOT to DOT_DOT_EXPECTED

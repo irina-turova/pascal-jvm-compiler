@@ -35,7 +35,7 @@ abstract class Type {
 
     fun addingType(other: Type, operator: TokenType): Type? {
         return when {
-            operator == TokenType.OR -> if (this == ScopeManager.booleanType && other == ScopeManager.booleanType) ScopeManager.booleanType else null
+//            operator == TokenType.OR -> if (this == ScopeManager.booleanType && other == ScopeManager.booleanType) ScopeManager.booleanType else null
             this == other && this != ScopeManager.booleanType -> this
             else -> null
         }
@@ -43,7 +43,7 @@ abstract class Type {
 
     fun multiplyingType(other: Type, operator: TokenType): Type? {
         return when {
-            operator == TokenType.AND -> if (this == ScopeManager.booleanType && other == ScopeManager.booleanType) ScopeManager.booleanType else null
+//            operator == TokenType.AND -> if (this == ScopeManager.booleanType && other == ScopeManager.booleanType) ScopeManager.booleanType else null
             operator == TokenType.DIV || operator == TokenType.MOD -> if (this == other && this == ScopeManager.integerType) this else null
             setOf<Type>(
                 ScopeManager.integerType,
