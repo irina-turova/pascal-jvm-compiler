@@ -4,6 +4,8 @@ import lexer.TokenType
 import semantic.ScopeManager
 
 abstract class Type {
+    abstract var jvmName: String
+
     fun isSignable(): Boolean {
         return this == ScopeManager.integerType || this == ScopeManager.realType
     }
@@ -55,11 +57,17 @@ abstract class Type {
     }
 }
 
-class ProgramType: Type()
+class ProgramType: Type() {
+    override var jvmName = ""
+}
 
-class ProgramParameterType: Type()
+class ProgramParameterType: Type(){
+    override var jvmName = ""
+}
 
-class ScalarType: Type()
+class ScalarType(override var jvmName: String) : Type()
 
-class EnumType(constants: List<String>): Type()
+class EnumType(constants: List<String>): Type(){
+    override var jvmName = ""
+}
 

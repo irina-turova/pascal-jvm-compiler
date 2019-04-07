@@ -54,6 +54,10 @@ class ScopeManager {
         variablesBuffer.clear()
     }
 
+    fun getBufferedVariables(): List<Identifier> {
+        return variablesBuffer.toList()
+    }
+
     fun findLocalIdentifier(token: Token): Identifier? {
         if (token !is IdentifierToken)
             return null
@@ -104,9 +108,9 @@ class ScopeManager {
     companion object {
         val programType = ProgramType()
         val programParameterType = ProgramParameterType()
-        val integerType = ScalarType()
+        val integerType = ScalarType("I")
         val booleanType = EnumType(listOf("false", "true"))
-        val realType = ScalarType()
-        val charType = ScalarType()
+        val realType = ScalarType("F")
+        val charType = ScalarType("C") // ?
     }
 }

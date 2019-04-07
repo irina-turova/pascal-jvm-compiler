@@ -7,7 +7,7 @@ open class Token(val type: TokenType, val position: TextPosition) {
         val KEYWORDS = mapOf(
 //            "and" to TokenType.AND,
             "begin" to TokenType.BEGIN,
-//            "div" to TokenType.DIV,
+            "div" to TokenType.DIV,
 //            "do" to TokenType.DO,
 //            "downto" to TokenType.DOWN_TO,
 //            "else" to TokenType.ELSE,
@@ -23,7 +23,7 @@ open class Token(val type: TokenType, val position: TextPosition) {
 //            "repeat" to TokenType.REPEAT,
 //            "then" to TokenType.THEN,
 //            "to" to TokenType.TO,
-//            "type" to TokenType.TYPE,
+            "type" to TokenType.TYPE,
 //            "until" to TokenType.UNTIL,
             "var" to TokenType.VAR //,
 //            "while" to TokenType.WHILE

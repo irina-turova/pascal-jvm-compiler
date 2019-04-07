@@ -3,10 +3,13 @@ package parser
 import common.Error
 import common.ErrorCode
 import common.ErrorList
-import lexer.IdentifierToken
-import lexer.Lexer
-import lexer.Token
-import lexer.TokenType
+import generator.CG
+import generator.ConstantOperand
+import generator.VariableType
+import jdk.internal.org.objectweb.asm.ClassWriter
+import jdk.internal.org.objectweb.asm.Label
+import jdk.internal.org.objectweb.asm.Opcodes.*
+import lexer.*
 import semantic.ScopeManager
 import semantic.identifiers.ConstantIdentifier
 import semantic.identifiers.ProgramIdentifier
@@ -57,9 +60,34 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         }
     }
 
-    fun parse() {
+    fun parse(): ByteArray? {
+
+        // < cg
+        val cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
+        cw.visit(V1_8, ACC_PUBLIC, "PascalProgram", null, "java/lang/Object", null)
+
+        CG.mainMethodWriter = cw.visitMethod(ACC_PUBLIC or ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null)
+        CG.mainMethodWriter.visitCode()
+        // labels are used by ASM to mark points in the code
+        CG.methodStart = Label()
+        CG.methodEnd = Label()
+        // with this call we indicate to what point in the method the label methodStart corresponds
+        CG.mainMethodWriter.visitLabel(CG.methodStart)
+        // cg >
+
         program(setOf(TokenType.THIS_IS_THE_END))
         lexer.flush()
+
+        // < cg
+        // We just says that here is the end of the method
+        CG.mainMethodWriter.visitLabel(CG.methodEnd)
+        // And we had the return instruction
+        CG.mainMethodWriter.visitInsn(RETURN)
+        CG.mainMethodWriter.visitEnd()
+        CG.mainMethodWriter.visitMaxs(0, 0)
+        cw.visitEnd()
+        return cw.toByteArray()
+        // cg >
     }
 
     private fun accept(expectedToken: TokenType) {
@@ -69,7 +97,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             pushError(ErrorCode.fromExpectedToken(expectedToken))
     }
 
-    private val blockStarters = setOf(/* TokenType.TYPE, */ TokenType.VAR /*, TokenType.FUNCTION */, TokenType.BEGIN)
+    private val blockStarters = setOf(TokenType.TYPE, TokenType.VAR /*, TokenType.FUNCTION */, TokenType.BEGIN)
     private val structuredStatementStarters = setOf(TokenType.BEGIN /*, TokenType.IF, TokenType.WHILE, TokenType.REPEAT, TokenType.FOR */)
     private val simpleStatementStarters = setOf(TokenType.IDENTIFIER)
     private val unsignedConstantStarters = setOf(TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT)
@@ -157,7 +185,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         checkBeg(blockStarters, followers)
 
         if (currentToken.type in blockStarters) {
-            // type_definition_part( followers union setOf(TokenType.VAR, TokenType.FUNCTION, TokenType.BEGIN))
+            type_definition_part( followers union setOf(TokenType.VAR, TokenType.BEGIN))
             variable_declaration_part(followers union setOf(TokenType.BEGIN) )
             statement_part(followers)
 
@@ -168,43 +196,43 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     /**
      * <type definition part> ::= <empty> | type <type definition> {;<type definition>};
      */
-//    private fun type_definition_part(followers: Set<TokenType>) {
-//        checkBeg(setOf(TokenType.TYPE, TokenType.VAR, TokenType.FUNCTION, TokenType.BEGIN), followers)
-//
-//        if (currentToken.type == TokenType.TYPE) {
-//            accept(TokenType.TYPE)
-//            type_definition(followers union setOf(TokenType.SEMICOLON))
-//            accept(TokenType.SEMICOLON)
-//            while (currentToken.type == TokenType.IDENTIFIER) {
-//                type_definition(followers union setOf(TokenType.SEMICOLON))
-//                accept(TokenType.SEMICOLON)
-//            }
-//            checkEnd(followers)
-//        }
-//    }
+    private fun type_definition_part(followers: Set<TokenType>) {
+        checkBeg(setOf(TokenType.TYPE, TokenType.VAR, TokenType.BEGIN), followers)
+
+        if (currentToken.type == TokenType.TYPE) {
+            accept(TokenType.TYPE)
+            type_definition(followers union setOf(TokenType.SEMICOLON))
+            accept(TokenType.SEMICOLON)
+            while (currentToken.type == TokenType.IDENTIFIER) {
+                type_definition(followers union setOf(TokenType.SEMICOLON))
+                accept(TokenType.SEMICOLON)
+            }
+            checkEnd(followers)
+        }
+    }
 
     /**
      * <type definition> ::= <identifier> = <type>
      */
-//    private fun type_definition(followers: Set<TokenType>) {
-//        val starters = setOf(TokenType.IDENTIFIER)
-//        checkBeg(starters, followers)
-//
-//        if (currentToken.type in starters) {
-//            val token = currentToken
-//            val identifier = if (token is IdentifierToken) TypeIdentifier(token.identifier)
-//            else null
-//            if (identifier != null && scopeManager.addIdentifier(identifier) != null)
-//                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
-//
-//            accept(TokenType.IDENTIFIER)
-//            accept(TokenType.EQUAL_OPERATOR)
-//            val typedef = type(followers)
-//            identifier?.type = typedef
-//
-//            checkEnd(followers)
-//        }
-//    }
+    private fun type_definition(followers: Set<TokenType>) {
+        val starters = setOf(TokenType.IDENTIFIER)
+        checkBeg(starters, followers)
+
+        if (currentToken.type in starters) {
+            val token = currentToken
+            val identifier = if (token is IdentifierToken) TypeIdentifier(token.identifier)
+            else null
+            if (identifier != null && scopeManager.addIdentifier(identifier) != null)
+                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
+
+            accept(TokenType.IDENTIFIER)
+            accept(TokenType.EQUAL_OPERATOR)
+            val typedef = type(followers)
+            identifier?.type = typedef
+
+            checkEnd(followers)
+        }
+    }
 
     /**
      * <variable declaration part> ::= <empty> | var <variable declaration> {; <variable declaration>} ;
@@ -236,6 +264,12 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             identifier_list(followers + TokenType.COLON)
             accept(TokenType.COLON)
             val variableType = type(followers)
+
+            scopeManager.getBufferedVariables().forEach {
+                if (it is VariableIdentifier && variableType != null)
+                    CG.mainMethodWriter.visitLocalVariable(it.name, variableType.jvmName, null, CG.methodStart, CG.methodEnd, it.id)
+            }
+
             scopeManager.flushVariableBuffer(variableType)
             checkEnd(followers)
         }
@@ -324,6 +358,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      */
     private fun statement(followers: Set<TokenType>) {
         unlabelled_statement(followers)
+        CG.flush()
     }
 
     /**
@@ -354,11 +389,36 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             accept(TokenType.IDENTIFIER)
             when (currentToken.type) {
                 TokenType.ASSIGN_OPERATOR -> assignment_statement(followers, identifierName)
-                else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
+                else -> if (identifierName.toLowerCase() == "writeln") writeln_statement(followers)
+                    else pushError(ErrorCode.UNEXPECTED_SYMBOL)
             }
 
             checkEnd(followers)
         }
+    }
+
+    private fun writeln_statement(followers: Set<TokenType>) {
+
+        CG.mainMethodWriter.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;")
+        // we push the value we want to print on the stack
+
+        if (currentToken.type == TokenType.LEFT_BRACKET) {
+            accept(TokenType.LEFT_BRACKET)
+            val expType = expression(followers + TokenType.RIGHT_BRACKET)
+            accept(TokenType.RIGHT_BRACKET)
+            CG.flush()
+            CG.flush()
+            CG.mainMethodWriter.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(${expType?.jvmName ?: "I"})V", false)
+        } else {
+            CG.mainMethodWriter.visitLdcInsn("Hello, World! From bytecode!")
+            CG.mainMethodWriter.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false)
+        }
+        // we call the method println of System.out to print the value. It will take its parameter from the stack
+        // note that we have to tell the JVM which variant of println to call. To do that we describe the signature of the method,
+        // depending on the type of the value we want to print. If we want to print an int we will produce the signature "(I)V",
+        // we will produce "(D)V" for a double
+
+        checkEnd(followers)
     }
 
     /**
@@ -380,6 +440,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             // accept(TokenType.IDENTIFIER)
             accept(TokenType.ASSIGN_OPERATOR)
             val expressionType = expression(followers)
+
+            if (identifier is VariableIdentifier && expressionType != null)
+                CG.assign(identifier, expressionType)
 
             val identifierType = identifier?.type
             if (identifierType != null && expressionType != null && !identifierType.isCompatibleTo(expressionType))
@@ -472,8 +535,17 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in simpleExpressionStarters) {
 
             if (currentToken.type in setOf(TokenType.PLUS, TokenType.MINUS)) {
+                val needNegotiation = currentToken.type == TokenType.MINUS
                 sign()
                 resultType = term(followers + addingOperators)
+                if (needNegotiation)
+                    CG.mainMethodWriter.visitInsn(
+                        when (resultType?.jvmName) {
+                            "I" -> INEG
+                            "F" -> FNEG
+                            else -> INEG
+                        }
+                    )
 
                 if (resultType != null && !resultType.isSignable())
                     pushError(ErrorCode.INTEGER_OR_REAL_EXPRESSION_EXPECTED)
@@ -485,6 +557,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                 resultType = term(followers + addingOperators)
 
             while (currentToken.type in addingOperators) {
+                CG.addOperator(currentToken.type)
                 val operator = currentToken.type
                 adding_operator()
                 val termType = term(followers + addingOperators)
@@ -535,6 +608,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in termStarters) {
             resultType = factor(followers + multiplyingOperators)
             while (currentToken.type in multiplyingOperators) {
+                CG.addOperator(currentToken.type)
                 val operator = currentToken.type
                 multiplying_operator()
                 val factorType = factor(followers + multiplyingOperators)
@@ -584,9 +658,11 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                     TokenType.CHAR_CONSTANT
                 ) -> resultType = unsigned_constant()
                 currentToken.type == TokenType.LEFT_BRACKET -> {
+                    CG.addOperator(TokenType.LEFT_BRACKET)
                     accept(TokenType.LEFT_BRACKET)
                     resultType = expression(followers + TokenType.RIGHT_BRACKET)
                     accept(TokenType.RIGHT_BRACKET)
+                    CG.addOperator(TokenType.RIGHT_BRACKET)
                 }
 //                currentToken.type == TokenType.NOT -> {
 //                    accept(TokenType.NOT)
@@ -610,7 +686,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * <variable> ::= <entire variable> | <component variable> | <referenced variable>
      */
     private fun variable(): Type? {
-        val identifier = scopeManager.findIdentifier(currentToken)
+        val identifier = scopeManager.findIdentifier(currentToken) as? VariableIdentifier
+        CG.addOperand(VariableType(identifier?.id ?: -1, identifier?.type ?: ScopeManager.integerType))
         accept(TokenType.IDENTIFIER)
         return identifier?.type
     }
@@ -620,6 +697,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * <unsigned constant> ::= <unsigned number> | <string> | < constant identifier> < nil>
      */
     private fun unsigned_constant(): Type? {
+
+        val constant = (currentToken as? ConstantToken)?.value ?: 0
 
         val resultType: Type?
         when {
@@ -640,6 +719,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                 resultType = null
             }
         }
+
+        CG.addOperand(ConstantOperand(constant, resultType ?: ScopeManager.integerType))
+
         return resultType
     }
 

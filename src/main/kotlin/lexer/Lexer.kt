@@ -62,7 +62,7 @@ class Lexer(private val io: IOProvider, private val errors: ErrorList) {
                         if (number.toInt() > maxInt)
                             errors.pushError(Error(tokenPosition, ErrorCode.CONSTANT_OUT_OF_RANGE))
                         TokenType.INT_CONSTANT
-                    }, tokenPosition, number)
+                    }, tokenPosition, number.toIntOrNull() ?: number.toFloat())
             }
             '\'' -> {
                 io.takeNextChar()
@@ -140,10 +140,10 @@ class Lexer(private val io: IOProvider, private val errors: ErrorList) {
                 } else
                     Token(TokenType.SLASH, tokenPosition)
             }
-//            '=' -> {
-//                io.takeNextChar()
-//                Token(TokenType.EQUAL_OPERATOR, tokenPosition)
-//            }
+            '=' -> {
+                io.takeNextChar()
+                Token(TokenType.EQUAL_OPERATOR, tokenPosition)
+            }
             '(' -> {
                 io.takeNextChar()
                 if (io.nextChar() == '*') {

@@ -6,7 +6,12 @@ abstract class Identifier(open val name: String, var type: Type?)
 
 class ProgramIdentifier(name: String, type: Type? = null): Identifier(name, type)
 
-class VariableIdentifier(name: String, type: Type? = null): Identifier(name, type)
+class VariableIdentifier(name: String, type: Type? = null): Identifier(name, type) {
+    val id = nextIdentifier++
+    companion object {
+        var nextIdentifier = 1
+    }
+}
 
 class ConstantIdentifier(name: String, type: Type? = null): Identifier(name, type)
 

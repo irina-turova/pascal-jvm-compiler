@@ -17,7 +17,7 @@ enum class TokenType {
 
     ASSIGN_OPERATOR,
 
-//    EQUAL_OPERATOR,
+    EQUAL_OPERATOR,
 //    NOT_EQUAL_OPERATOR,
 //    LESS_OPERATOR,
 //    LESS_OR_EQUAL_OPERATOR,
@@ -39,7 +39,7 @@ enum class TokenType {
 //    CARET,
 
     PROGRAM,
-//    TYPE,
+    TYPE,
     VAR,
 //    FUNCTION,
     BEGIN,

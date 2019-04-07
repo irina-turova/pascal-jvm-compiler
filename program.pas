@@ -1,19 +1,26 @@
 program p1; // Find time difference in minutes
+type
+myinteger = integer;
+myint = integer;
+char = myint;
 var
-    hours1, minutes1, hours2, minutes2:integer;
-    allMinutes1, allMinutes2, result: integer;
+    hours1, minutes1, hours2, minutes2:myint;
+    allMinutes1, allMinutes2, result: real;
 begin
-    hours1:=15;
-    minutes1:=25;
+    hours1:=1;
+    minutes1:=3;
 
-    hours2:=15;
-    minutes2:=21;
+    hours2:=1;
+    minutes2:=4;
 
-    allMinutes1 := hours1 * 60 + minutes1;
+    allMinutes1 := - hours1 * (60 + minutes1 * (2 + hours1));
     allMinutes2 := hours2 * 60 + minutes2;
-    result := allMinutes2 - allMinutes1
+    writeln(allMinutes1);
+    writeln(allMinutes2);
+    result := allMinutes2 - allMinutes1;
 
-    // writeln(result)
+    writeln(result);
+    writeln(result + (-15.0))
 end.
 
 {program p1;
