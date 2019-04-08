@@ -1,121 +1,25 @@
-program p1; // Find time difference in minutes
-type
-myinteger = integer;
-myint = integer;
-char = myint;
-var
-    hours1, minutes1, hours2, minutes2:myint;
-    allMinutes1, allMinutes2, result: real;
-begin
-    hours1:=32767;
-    minutes1:=3;
-
-    hours2:=1;
-    minutes2:=4;
-
-    writeln(hours1+1);
-
-    allMinutes1 := - hours1;(* * (60 + minutes1 * (2 + hours1));*)
-    allMinutes2 := hours2 * 60 + minutes2;
-    writeln(allMinutes1);
-    writeln(allMinutes2);
-    result := allMinutes2 - allMinutes1;
-
-    writeln(result);
-    writeln(result + (-15.0))
-end.
-
-{program p1;
-var
-    a:integer;
-begin
-b:=1;
-b:=2;
-a:='c';
-a:='b';
-end.
-}
-
-
-
-{program Evklid;
-
-type
-myinteger = integer;
-myint = integer;
-char = myint;
-myint = char;
-
-var M, N, M :myinteger;
-d, M: real;
-p, s, f: char;
-bool: boolean;
-
-(*procedure f(a, b,c: Integer); forward;*)
-
-function f2(a, b, b: char; r: real):integer; Forward;
-
-function f2;
-type
-    mychar = real;
-var
-    int: mychar;
-    b: char;
-begin
-    r := 'a';
-    f2 := 3
-end;
-
-begin
-    M:=-N;
-    N:=14564;
-    f2:=10E37;
-    false:=true;
-    p := 'a';
-    if M = N then
-        d:=5;
-    while M<>N do begin
-        if M>N then
-            M:=M-N
-        else
-            N:=N-M
-    end;
-
-    //for i := 3 to 7 do
-    for bool := false to 6 do
-        M := N;
-
-    repeat
-        m:=n;
-        n := m
-    until m <> n;
-
-    f2(M + N, 3, f2(M + N, 3, 4, d + d), d + d, 7)
-
-end
-}
-{   program example(a,c,v);
+program example(a,c,v);
    const min1=555;
          max1=666;
    type day=(Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday);
      df=Monday..Friday;
-     // vector1=array [1..5] of real;
+     vector1=array [1..5] of real;
      int=integer;
      aaa=real;
      t=(erv,erg,rthrt,rtj);
-     // massiv=array[1..200,1..23] of integer;
+     massiv=array[1..200,1..23] of integer;
      12s=as;
    var
     perem:Monday;
-    // aa1:array [1..3,7..9] of array [1..3,7..9] of array[1..99] of int;
+    aa1:array [1..3,7..9] of array [1..3,7..9] of array[1..99] of int;
     m:array['a'..'s',integer] of integer;
     real:integer;
     h,i,t,r,o,w,g,f,g,z,x: integer;
     mas:array[] of int;
     m:array['a'..'s',integer] of integer;
-    // mas:array['a'..'s',integer] of array[char,1..2] of arrray[1..3] of integer;
-    // mas:array[array[1..10] of int,s..sd,integer] of array[char,1..2] of arrray[1..3] of integer;
-    //kl:34..1;
+    mas:array['a'..'s',integer] of array[char,1..2] of arrray[1..3] of integer;
+    mas:array[array[1..10] of int,s..sd,integer] of array[char,1..2] of arrray[1..3] of integer;
+    kl:34..1;
     iopi:'p'..1;
     asdasfsdf:integer;
     c:(asf,dafgr,ewrtg,dgfd,g54,e4tg);
@@ -123,7 +27,7 @@ end
     a,b:vector1;
     tip:min1..max1;
     tip2:max1..min1;
-    //a1:array [1..3,7..9] of int;
+    a1:array [1..3,7..9] of int;
 
     ff:'t'..'c';
 
@@ -178,7 +82,7 @@ end
       '1': g:=3;
         4: h:=6;
       6.6: h:=h
-    // end;
+     end;
     for mn:=false to true do
      f:=t*89;
     if (x mod 2)=0 then
@@ -208,5 +112,3 @@ end
     Aaa:=(3*3-x*4/4)-3*(1+1)*(asd^[5,, gg*ddd[y^, gg=hh*ooo]])-(1);
     dfg+asdf;
     end.
-
-    }
