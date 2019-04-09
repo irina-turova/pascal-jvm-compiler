@@ -482,10 +482,12 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * statement-sequence = statement { ` ;' statement } .
      */
     private fun statement_sequence(followers: Set<TokenType>) {
-        val starters = simpleStatementStarters + structuredStatementStarters
+        val starters = simpleStatementStarters + structuredStatementStarters + TokenType.END
         checkBeg(starters, followers)
 
-        if (currentToken.type in starters) {
+        if (currentToken.type == TokenType.END)
+            checkEnd(followers)
+        else if (currentToken.type in starters) {
             statement(followers + TokenType.SEMICOLON)
             while (currentToken.type == TokenType.SEMICOLON) {
                 accept(TokenType.SEMICOLON)

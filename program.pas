@@ -1,13 +1,13 @@
-{program p1;
+program p1;
 var
     a:integer;
 begin
 b:=1;
 b:=2;
 a:='c';
-a:='b';
+a:='b'
 end.
-}
+
 
 
 
