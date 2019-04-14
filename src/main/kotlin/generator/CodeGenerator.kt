@@ -64,7 +64,9 @@ object CodeGenerator {
         val desiredType = operandTypes.pop()
         val firstOperandType = operandTypes.pop()
 
-        when (operators.pop()) {
+        val operator = operators.pop()
+
+        when (operator) {
             TokenType.PLUS -> {
                 when(desiredType.jvmName) {
                     "I" -> mainMethodWriter.visitInsn(Opcodes.IADD)
@@ -107,6 +109,42 @@ object CodeGenerator {
                     else -> mainMethodWriter.visitInsn(Opcodes.IREM)
                 }
             }
+            TokenType.EQUAL_OPERATOR, TokenType.NOT_EQUAL_OPERATOR, TokenType.LESS_OPERATOR,
+            TokenType.LESS_OR_EQUAL_OPERATOR, TokenType.GREATER_OR_EQUAL_OPERATOR, TokenType.GREATER_OPERATOR -> {
+
+                val (ifCmpOp, fCmpOp) = when (operator) {
+                    TokenType.EQUAL_OPERATOR -> Pair(IF_ICMPEQ, IFEQ)
+                    TokenType.NOT_EQUAL_OPERATOR -> Pair(IF_ICMPNE, IFNE)
+                    TokenType.LESS_OPERATOR -> Pair(IF_ICMPLT, IFLT)
+                    TokenType.LESS_OR_EQUAL_OPERATOR -> Pair(IF_ICMPLE, IFLE)
+                    TokenType.GREATER_OR_EQUAL_OPERATOR -> Pair(IF_ICMPGE, IFGE)
+                    TokenType.GREATER_OPERATOR -> Pair(IF_ICMPGT, IFGT)
+                    else -> Pair(IF_ICMPLT, IFLT)
+                }
+
+                val put1 = Label()
+                val after = Label()
+
+                if (desiredType.jvmName == "I")
+                    mainMethodWriter.visitJumpInsn(ifCmpOp, put1)
+                else {
+                    mainMethodWriter.visitInsn(FCMPL)
+                    mainMethodWriter.visitJumpInsn(fCmpOp, put1)
+                }
+
+                mainMethodWriter.visitLdcInsn(0)
+                mainMethodWriter.visitJumpInsn(GOTO, after)
+                mainMethodWriter.visitLabel(put1)
+                mainMethodWriter.visitLdcInsn(1)
+                mainMethodWriter.visitLabel(after)
+            }
+            TokenType.AND -> mainMethodWriter.visitInsn(IAND)
+            TokenType.OR -> mainMethodWriter.visitInsn(IOR)
+            TokenType.NOT -> {
+                mainMethodWriter.visitLdcInsn(1)
+                mainMethodWriter.visitInsn(IXOR)
+            }
+
         }
         operandTypes.push(desiredType)
     }
@@ -133,9 +171,12 @@ object CodeGenerator {
 
     private fun getOperatorPriority(operator: TokenType): Int {
         return when (operator) {
-            TokenType.PLUS, TokenType.MINUS -> 1
-            TokenType.STAR, TokenType.SLASH, TokenType.DIV, TokenType.MOD -> 2
-            TokenType.LEFT_BRACKET -> 3
+            TokenType.EQUAL_OPERATOR, TokenType.NOT_EQUAL_OPERATOR, TokenType.LESS_OPERATOR,
+            TokenType.LESS_OR_EQUAL_OPERATOR, TokenType.GREATER_OR_EQUAL_OPERATOR, TokenType.GREATER_OPERATOR -> 2
+            TokenType.PLUS, TokenType.MINUS, TokenType.OR -> 3
+            TokenType.STAR, TokenType.SLASH, TokenType.DIV, TokenType.MOD, TokenType.AND -> 4
+            TokenType.NOT -> 5
+            TokenType.LEFT_BRACKET -> 6
             else ->  throw Exception("Generation: operator $operator is not supported")
         }
     }

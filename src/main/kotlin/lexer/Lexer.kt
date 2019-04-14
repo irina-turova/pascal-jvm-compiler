@@ -94,21 +94,21 @@ class Lexer(private val io: IOProvider, private val errors: ErrorList) {
 //                io.takeNextChar()
 //                Token(TokenType.CARET, tokenPosition)
 //            }
-//            '<' -> {
-//                io.takeNextChar()
-//                when {
-//                    io.nextChar() == '=' -> Token(TokenType.LESS_OR_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
-//                    io.nextChar() == '>' -> Token(TokenType.NOT_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
-//                    else -> Token(TokenType.LESS_OPERATOR, tokenPosition)
-//                }
-//            }
-//            '>' -> {
-//                io.takeNextChar()
-//                if (io.nextChar() == '=')
-//                    Token(TokenType.GREATER_OR_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
-//                else
-//                    Token(TokenType.GREATER_OPERATOR, tokenPosition)
-//            }
+            '<' -> {
+                io.takeNextChar()
+                when {
+                    io.nextChar() == '=' -> Token(TokenType.LESS_OR_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
+                    io.nextChar() == '>' -> Token(TokenType.NOT_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
+                    else -> Token(TokenType.LESS_OPERATOR, tokenPosition)
+                }
+            }
+            '>' -> {
+                io.takeNextChar()
+                if (io.nextChar() == '=')
+                    Token(TokenType.GREATER_OR_EQUAL_OPERATOR, tokenPosition).also { io.takeNextChar() }
+                else
+                    Token(TokenType.GREATER_OPERATOR, tokenPosition)
+            }
             '.' -> {
                 io.takeNextChar()
                 if (io.nextChar() == '.')

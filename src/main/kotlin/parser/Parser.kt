@@ -98,10 +98,10 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     }
 
     private val blockStarters = setOf(TokenType.TYPE, TokenType.VAR /*, TokenType.FUNCTION */, TokenType.BEGIN)
-    private val structuredStatementStarters = setOf(TokenType.BEGIN /*, TokenType.IF, TokenType.WHILE, TokenType.REPEAT, TokenType.FOR */)
+    private val structuredStatementStarters = setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE /*, TokenType.REPEAT, TokenType.FOR */)
     private val simpleStatementStarters = setOf(TokenType.IDENTIFIER)
     private val unsignedConstantStarters = setOf(TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT)
-    private val factorStarters = setOf(TokenType.IDENTIFIER, TokenType.LEFT_BRACKET /*, TokenType.NOT*/) + unsignedConstantStarters
+    private val factorStarters = setOf(TokenType.IDENTIFIER, TokenType.LEFT_BRACKET, TokenType.NOT) + unsignedConstantStarters
     private val termStarters = factorStarters
     private val simpleExpressionStarters = setOf(TokenType.PLUS, TokenType.MINUS) + termStarters
 
@@ -371,8 +371,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in starters) {
             when {
                 currentToken.type == TokenType.IDENTIFIER -> simple_statement(followers)
-                currentToken.type in setOf(TokenType.BEGIN /*, TokenType.IF, TokenType.WHILE */) -> structured_statement(followers)
-                else -> pushError(ErrorCode.IDENTIFIER_EXPECTED) // TODO: check if it's ok
+                currentToken.type in setOf(TokenType.BEGIN, TokenType.IF, TokenType.WHILE) -> structured_statement(followers)
+                else -> pushError(ErrorCode.IDENTIFIER_EXPECTED)
             }
             checkEnd(followers)
         }
@@ -410,7 +410,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             CG.flush()
             CG.mainMethodWriter.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(${expType?.jvmName ?: "I"})V", false)
         } else {
-            CG.mainMethodWriter.visitLdcInsn("Hello, World! From bytecode!")
+            CG.mainMethodWriter.visitLdcInsn("")
             CG.mainMethodWriter.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false)
         }
         // we call the method println of System.out to print the value. It will take its parameter from the stack
@@ -465,8 +465,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in structuredStatementStarters) {
             when (currentToken.type) {
                 TokenType.BEGIN -> compound_statement(followers)
-                // TokenType.IF -> conditional_statement(followers)
-                // TokenType.WHILE -> repetitive_statement(followers)
+                 TokenType.IF -> conditional_statement(followers)
+                 TokenType.WHILE -> repetitive_statement(followers)
                 else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE, REPEAT, FOR")
             }
             checkEnd(followers)
@@ -476,27 +476,39 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     /**
      * <conditional statement> ::= <if statement> | <case statement>
      */
-//    private fun conditional_statement(followers: Set<TokenType>) {
-//        if_statement(followers)
-//    }
+    private fun conditional_statement(followers: Set<TokenType>) {
+        if_statement(followers)
+    }
 
     /** no before neutralization needed
      * <if statement> ::= if <expression> then <statement> | if <expression> then <statement> else <statement>
      */
-//    private fun if_statement(followers: Set<TokenType>) {
-//        accept(TokenType.IF)
-//
-//        val expressionType = expression(followers + TokenType.THEN)
-//        if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
-//            pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
-//        accept(TokenType.THEN)
-//        statement(followers + TokenType.ELSE)
-//        if (currentToken.type == TokenType.ELSE) {
-//            accept(TokenType.ELSE)
-//            statement(followers)
-//        }
-//        checkEnd(followers)
-//    }
+    private fun if_statement(followers: Set<TokenType>) {
+        accept(TokenType.IF)
+
+        val expressionType = expression(followers + TokenType.THEN)
+        CG.flush()
+        if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
+            pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
+
+        accept(TokenType.THEN)
+
+        val alternativeLabel = Label()
+        val afterLabel = Label()
+        CG.mainMethodWriter.visitJumpInsn(IFEQ, alternativeLabel)
+
+        statement(followers + TokenType.ELSE)
+
+        CG.mainMethodWriter.visitJumpInsn(GOTO, afterLabel)
+        CG.mainMethodWriter.visitLabel(alternativeLabel)
+
+        if (currentToken.type == TokenType.ELSE) {
+            accept(TokenType.ELSE)
+            statement(followers)
+        }
+        CG.mainMethodWriter.visitLabel(afterLabel)
+        checkEnd(followers)
+    }
 
     /**
      * <expression> ::= <simple expression> | <simple expression> <relational operator> <simple expression>
@@ -508,16 +520,17 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         var resultType: Type? = null
 
         if (currentToken.type in starters) {
-            resultType = simple_expression(followers /* + relationalOperators */)
-//            if (currentToken.type in relationalOperators) {
-//                val operator = currentToken.type
-//                relational_operator()
-//                val expType = simple_expression(followers)
-//                resultType = if (resultType != null && expType != null)
-//                    resultType.comparingType(expType, operator)
-//                        .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
-//                else null
-//            }
+            resultType = simple_expression(followers + relationalOperators)
+            if (currentToken.type in relationalOperators) {
+                CG.addOperator(currentToken.type)
+                val operator = currentToken.type
+                relational_operator()
+                val expType = simple_expression(followers)
+                resultType = if (resultType != null && expType != null)
+                    resultType.comparingType(expType, operator)
+                        .also { if (it == null) pushError(ErrorCode.OPERAND_TYPES_DO_NOT_MATCH_OPERATOR) }
+                else null
+            }
 
             checkEnd(followers)
         }
@@ -551,7 +564,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                     pushError(ErrorCode.INTEGER_OR_REAL_EXPRESSION_EXPECTED)
             } else if (currentToken.type in setOf(
                     TokenType.IDENTIFIER, TokenType.INT_CONSTANT, TokenType.DOUBLE_CONSTANT, TokenType.CHAR_CONSTANT,
-                    TokenType.LEFT_BRACKET /*, TokenType.NOT */
+                    TokenType.LEFT_BRACKET, TokenType.NOT
                 )
             )
                 resultType = term(followers + addingOperators)
@@ -576,7 +589,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     /**
      * <adding operator> ::= + | - | or
      */
-    private val addingOperators = setOf(TokenType.PLUS, TokenType.MINUS /*, TokenType.OR */)
+    private val addingOperators = setOf(TokenType.PLUS, TokenType.MINUS, TokenType.OR)
     private fun adding_operator() {
         for (opToken in addingOperators)
             if (currentToken.type == opToken) {
@@ -664,12 +677,13 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                     accept(TokenType.RIGHT_BRACKET)
                     CG.addOperator(TokenType.RIGHT_BRACKET)
                 }
-//                currentToken.type == TokenType.NOT -> {
-//                    accept(TokenType.NOT)
-//                    resultType = factor(followers)
-//                    if (resultType != null && !resultType.isLogical())
-//                        pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
-//                }
+                currentToken.type == TokenType.NOT -> {
+                    accept(TokenType.NOT)
+                    CG.addOperator(TokenType.NOT)
+                    resultType = factor(followers)
+                    if (resultType != null && !resultType.isLogical())
+                        pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
+                }
                 else -> {
                     pushError(ErrorCode.IDENTIFIER_EXPECTED) // ?
                     resultType = null
@@ -729,7 +743,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * <multiplying operator> ::= * | / | div | mod | and
      */
     private val multiplyingOperators = setOf(TokenType.STAR, TokenType.SLASH, TokenType.DIV,
-        TokenType.MOD /* , TokenType.AND */)
+        TokenType.MOD, TokenType.AND)
     private fun multiplying_operator() {
         for (opToken in multiplyingOperators)
             if (currentToken.type == opToken) {
@@ -742,36 +756,49 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     /**
      * <relational operator> ::= = | <> | < | <= | >= | > | in
      */
-//    private val relationalOperators = setOf(TokenType.EQUAL_OPERATOR, TokenType.NOT_EQUAL_OPERATOR, TokenType.LESS_OPERATOR,
-//        TokenType.LESS_OR_EQUAL_OPERATOR, TokenType.GREATER_OR_EQUAL_OPERATOR, TokenType.GREATER_OPERATOR)
-//    private fun relational_operator() {
-//        for (opToken in relationalOperators)
-//            if (currentToken.type == opToken) {
-//                accept(opToken)
-//                return
-//            }
-//        throw Exception("Unexpected error - here MUST be one of =, <>, <, <=, >=, >, in")
-//    }
+    private val relationalOperators = setOf(TokenType.EQUAL_OPERATOR, TokenType.NOT_EQUAL_OPERATOR, TokenType.LESS_OPERATOR,
+        TokenType.LESS_OR_EQUAL_OPERATOR, TokenType.GREATER_OR_EQUAL_OPERATOR, TokenType.GREATER_OPERATOR)
+    private fun relational_operator() {
+        for (opToken in relationalOperators)
+            if (currentToken.type == opToken) {
+                accept(opToken)
+                return
+            }
+        throw Exception("Unexpected error - here MUST be one of =, <>, <, <=, >=, >, in")
+    }
 
     /**
      * no before neutralization needed
      * <repetitive statement> ::= <while statement> | <repeat statement> | <for statement>
      */
-//    private fun repetitive_statement(followers: Set<TokenType>) {
-//        while_statement(followers)
-//    }
+    private fun repetitive_statement(followers: Set<TokenType>) {
+        while_statement(followers)
+    }
 
     /**
      * no before neutralization needed
      * <while statement> ::= while <expression> do <statement>
      */
-//    private fun while_statement(followers: Set<TokenType>) {
-//        accept(TokenType.WHILE)
-//        val expressionType = expression(followers + TokenType.DO)
-//        if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
-//            pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
-//        accept(TokenType.DO)
-//        statement(followers)
-//    }
+    private fun while_statement(followers: Set<TokenType>) {
+        accept(TokenType.WHILE)
+
+        val checkExprLabel = Label()
+        val afterLabel = Label()
+        CG.mainMethodWriter.visitLabel(checkExprLabel)
+
+        val expressionType = expression(followers + TokenType.DO)
+        CG.flush()
+        if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
+            pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
+        accept(TokenType.DO)
+
+        CG.mainMethodWriter.visitJumpInsn(IFEQ, afterLabel)
+
+        statement(followers)
+
+        CG.mainMethodWriter.visitJumpInsn(GOTO, checkExprLabel)
+
+        CG.mainMethodWriter.visitLabel(afterLabel)
+    }
 
 }

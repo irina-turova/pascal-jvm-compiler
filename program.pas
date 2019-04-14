@@ -1,28 +1,50 @@
-program p1; // Find time difference in minutes
+program p1; // Тернарный поиск корня квадратного уравнения
 type
 myinteger = integer;
 myint = integer;
 char = myint;
 var
-    hours1, minutes1, hours2, minutes2:myint;
-    allMinutes1, allMinutes2, result: real;
+    itersCount: myint;
+    a, b, c, x, L, R, mid1, mid2, eps: real;
 begin
-    hours1:=32767;
-    minutes1:=3;
 
-    hours2:=1;
-    minutes2:=4;
+    a := -1;
+    b := -10;
+    c := -25;
 
-    writeln(hours1+1);
+    L := -100;
+    R := 100;
+    eps := 0.001;
 
-    allMinutes1 := - hours1;(* * (60 + minutes1 * (2 + hours1));*)
-    allMinutes2 := hours2 * 60 + minutes2;
-    writeln(allMinutes1);
-    writeln(allMinutes2);
-    result := allMinutes2 - allMinutes1;
+    itersCount := 0;
 
-    writeln(result);
-    writeln(result + (-15.0))
+    while NOT (R - L <= eps) AND (itersCount < 100) do begin
+
+        writeln(L);
+        writeln(R);
+        writeln;
+
+        mid1 := L + (R - L) / 3.0;
+        mid2 := L + 2.0 * (R - L) / 3.0;
+
+        if a >= 0.0 then
+            if (a * mid2 * mid2 + b * mid2 + c) >= (a * mid1 * mid1 + b * mid1 + c) then
+                R := mid2
+            else
+                L := mid1
+        else
+            if (a * mid2 * mid2 + b * mid2 + c) < (a * mid1 * mid1 + b * mid1 + c) then
+                R := mid2
+            else
+                L := mid1;
+
+        itersCount := itersCount + 1
+    end;
+
+    writeln(itersCount);
+    writeln;
+    writeln((L + R) / 2.0)
+
 end.
 
 {program p1;
