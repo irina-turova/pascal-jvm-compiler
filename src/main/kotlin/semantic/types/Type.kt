@@ -68,7 +68,5 @@ class ProgramParameterType: Type(){
 
 class ScalarType(override var jvmName: String) : Type()
 
-class EnumType(constants: List<String>): Type(){
-    override var jvmName = ""
-}
+class EnumType(constants: List<String>, override var jvmName: String): Type()
 

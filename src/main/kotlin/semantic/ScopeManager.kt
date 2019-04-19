@@ -109,7 +109,7 @@ class ScopeManager {
         val programType = ProgramType()
         val programParameterType = ProgramParameterType()
         val integerType = ScalarType("I")
-        val booleanType = EnumType(listOf("false", "true"))
+        val booleanType = EnumType(listOf("false", "true"), "I")
         val realType = ScalarType("F")
         val charType = ScalarType("C") // ?
     }

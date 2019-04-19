@@ -6,7 +6,15 @@ char = myint;
 var
     itersCount: myint;
     a, b, c, x, L, R, mid1, mid2, eps: real;
+    bool, bool2: boolean;
 begin
+
+    bool := true OR false;
+    writeln(bool);
+    bool2 := NOT bool;
+    writeln(bool2);
+
+    if bool OR false then writeln(77);
 
     a := -1;
     b := -10;

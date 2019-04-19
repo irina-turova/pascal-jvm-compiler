@@ -653,7 +653,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                     when (identifier) {
                         is VariableIdentifier -> resultType = variable()
                         is ConstantIdentifier -> {
-                            resultType = identifier.type; currentToken = getNextSymbol()
+                            resultType = identifier.type;
+                            CG.addOperand(ConstantOperand(if (identifier.name.toLowerCase() == "true") 1 else 0, ScopeManager.booleanType))
+                            currentToken = getNextSymbol()
                         }
                         else -> {
                             accept(TokenType.IDENTIFIER)
