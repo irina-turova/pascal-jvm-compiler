@@ -90,10 +90,10 @@ class Lexer(private val io: IOProvider, private val errors: ErrorList) {
                 io.takeNextChar()
                 Token(TokenType.COMMA, tokenPosition)
             }
-//            '^' -> {
-//                io.takeNextChar()
-//                Token(TokenType.CARET, tokenPosition)
-//            }
+            '^' -> {
+                io.takeNextChar()
+                Token(TokenType.CARET, tokenPosition)
+            }
             '<' -> {
                 io.takeNextChar()
                 when {

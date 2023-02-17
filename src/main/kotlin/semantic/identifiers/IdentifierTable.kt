@@ -12,4 +12,7 @@ class IdentifierTable {
         return identifiers[identifier.toLowerCase()]
     }
 
+    fun findForwards(): List<FunctionIdentifier> {
+        return identifiers.values.filterIsInstance<FunctionIdentifier>().filter { it.isForward }
+    }
 }
