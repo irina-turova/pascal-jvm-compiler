@@ -1,18 +1,20 @@
 package parser
 
-import lexer.TokenType
-import lexer.Token
-import lexer.Lexer
-import java.lang.Exception
-import common.ErrorList
-import common.ErrorCode
 import common.Error
-import lexer.IdentifierToken
-import semantic.parameters.Parameter
+import common.ErrorCode
+import common.ErrorList
+import generator.CG
+import generator.ConstantOperand
+import generator.VariableType
+import jdk.internal.org.objectweb.asm.ClassWriter
+import jdk.internal.org.objectweb.asm.Label
+import jdk.internal.org.objectweb.asm.Opcodes.*
+import lexer.*
 import semantic.ScopeManager
+import semantic.identifiers.*
+import semantic.parameters.Parameter
 import semantic.parameters.TransmissionMode
 import semantic.types.Type
-import semantic.identifiers.*
 
 class Parser(private val lexer: Lexer, private val errors: ErrorList, private val scopeManager: ScopeManager) {
 
@@ -57,9 +59,34 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         }
     }
 
-    fun parse() {
+    fun parse(): ByteArray? {
+
+        // < cg
+        val cw = ClassWriter(ClassWriter.COMPUTE_FRAMES)
+        cw.visit(V1_8, ACC_PUBLIC, "PascalProgram", null, "java/lang/Object", null)
+
+        CG.mainMethodWriter = cw.visitMethod(ACC_PUBLIC or ACC_STATIC, "main", "([Ljava/lang/String;)V", null, null)
+        CG.mainMethodWriter.visitCode()
+        // labels are used by ASM to mark points in the code
+        CG.methodStart = Label()
+        CG.methodEnd = Label()
+        // with this call we indicate to what point in the method the label methodStart corresponds
+        CG.mainMethodWriter.visitLabel(CG.methodStart)
+        // cg >
+
         program(setOf(TokenType.THIS_IS_THE_END))
         lexer.flush()
+
+        // < cg
+        // We just says that here is the end of the method
+        CG.mainMethodWriter.visitLabel(CG.methodEnd)
+        // And we had the return instruction
+        CG.mainMethodWriter.visitInsn(RETURN)
+        CG.mainMethodWriter.visitEnd()
+        CG.mainMethodWriter.visitMaxs(0, 0)
+        cw.visitEnd()
+        return cw.toByteArray()
+        // cg >
     }
 
     private fun accept(expectedToken: TokenType) {
@@ -159,185 +186,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in blockStarters) {
             type_definition_part( followers union setOf(TokenType.VAR, TokenType.FUNCTION, TokenType.BEGIN))
             variable_declaration_part(followers union setOf(TokenType.FUNCTION, TokenType.BEGIN) )
-            procedure_and_function_declaration_part( followers union setOf(TokenType.BEGIN))
             statement_part(followers)
 
             checkEnd(followers)
-        }
-    }
-
-    /**
-     * <procedure and function declaration part> ::= {<procedure or function declaration > ;}
-     */
-    private fun procedure_and_function_declaration_part(followers: Set<TokenType>) {
-        val starters = setOf(TokenType.FUNCTION, TokenType.BEGIN)
-        checkBeg(starters, followers)
-
-        if (currentToken.type in starters) {
-            while (currentToken.type == TokenType.FUNCTION) {
-                function_declaration(followers + TokenType.SEMICOLON + TokenType.FUNCTION)
-                accept(TokenType.SEMICOLON)
-            }
-
-            scopeManager.findLocalForwards().forEach {
-                // TODO: Add explanation with func or proc name
-                pushError(ErrorCode.UNDEFINED_FORWARD)
-            }
-
-            checkEnd(followers)
-        }
-    }
-
-    /**
-     * formal-parameter-list = `(' formal-parameter-section { ` ;' formal-parameter-section } `)' .
-     */
-    private fun formal_parameter_list(
-        followers: Set<TokenType>,
-        parameters: MutableList<Parameter?>
-    ) {
-
-        accept(TokenType.LEFT_BRACKET)
-        formal_parameters_section(parameters)
-        while (currentToken.type == TokenType.SEMICOLON) {
-            accept(TokenType.SEMICOLON)
-            formal_parameters_section(parameters)
-        }
-        accept(TokenType.RIGHT_BRACKET)
-
-    }
-
-    /**
-     * function-declaration = function-heading ` ;' directive | function-identification ` ;' function-block
-     *      | function-heading ` ;' function-block .
-     *      
-     * we change to:
-     * function-declaration = `function` (function-heading ` ;' directive | function-identification ` ;' function-block
-     *      | function-heading ` ;' function-block )
-     */
-    private fun function_declaration(followers: Set<TokenType>) {
-
-        accept(TokenType.FUNCTION)
-
-        val identifier = scopeManager.findLocalIdentifier(currentToken)
-
-        if (identifier == null) {
-            val newIdentifier = function_heading(followers union blockStarters)
-                .also { scopeManager.addIdentifier(it) }
-            accept(TokenType.SEMICOLON)
-            currentToken.let {token ->
-                if (token is IdentifierToken &&  token.identifier.toLowerCase() == "forward") {
-                    accept(TokenType.IDENTIFIER)
-                    newIdentifier.isForward = true
-                } else {
-                    scopeManager.openScope(newIdentifier)
-                    block(followers)
-                    scopeManager.closeScope()
-                }
-            }
-        } else if (identifier is FunctionIdentifier && identifier.isForward) {
-            accept(TokenType.IDENTIFIER)
-            identifier.isForward = false
-            accept(TokenType.SEMICOLON)
-            scopeManager.openScope(identifier)
-            block(followers)
-            scopeManager.closeScope()
-        } else {
-            pushError(ErrorCode.DUPLICATE_IDENTIFIER)
-            checkEnd(followers)
-        }
-
-        checkEnd(followers)
-    }
-
-    /**
-     * function-heading = `function' identifier [ formal-parameter-list ] ':' result-type .
-     * 
-     * we change to:
-     * function-heading = identifier [ formal-parameter-list ] ':' result-type .
-     */
-    private fun function_heading(followers: Set<TokenType>): FunctionIdentifier {
-        val identifier = FunctionIdentifier((currentToken as IdentifierToken).identifier)
-        scopeManager.addIdentifier(identifier)
-
-        accept(TokenType.IDENTIFIER)
-
-        if (currentToken.type == TokenType.LEFT_BRACKET)
-            formal_parameter_list(followers, identifier.parameters)
-
-        accept(TokenType.COLON)
-        identifier.resultType = type_identifier()
-
-        checkEnd(followers)
-
-        return identifier
-    }
-
-    /**
-     * formal-parameter-section > value-parameter-specification
-     * | variable-parameter-specification
-     * | procedural-parameter-specification
-     * | functional-parameter-specification .
-     */
-    private fun formal_parameters_section(parameters: MutableList<Parameter?>) {
-        when(currentToken.type) {
-            TokenType.IDENTIFIER -> value_parameter_section(parameters)
-            TokenType.VAR -> variable_parameter_section(parameters)
-            else -> pushError(ErrorCode.UNEXPECTED_SYMBOL)
-        }
-    }
-
-    /**
-     * variable-parameter-section = var identifier-list ":" parameter-type
-     */
-    private fun variable_parameter_section(parameters: MutableList<Parameter?>) {
-        accept(TokenType.VAR)
-        parameter_group(parameters, TransmissionMode.VARIABLE)
-    }
-
-    /**
-     * value-parameter-section = identifier-list ":" parameter-type
-     */
-    private fun value_parameter_section(parameters: MutableList<Parameter?>) {
-        parameter_group(parameters, TransmissionMode.VALUE)
-    }
-
-    /**
-     * <parameter group> ::= <identifier> {, <identifier>} : <type identifier>
-     */
-    private fun parameter_group(parameters: MutableList<Parameter?>, transmissionMode: TransmissionMode) {
-
-        val tempParameters = mutableListOf<Parameter?>()
-
-        (currentToken as? IdentifierToken)?.let { token ->
-            if (parameters.any { it?.name == token.identifier }) {
-                pushError(ErrorCode.DUPLICATE_IDENTIFIER)
-                parameters.add(null)
-            } else {
-                parameters.add(Parameter(token.identifier, null, transmissionMode))
-                tempParameters.add(parameters.last())
-            }
-        }
-
-        accept(TokenType.IDENTIFIER)
-        while (currentToken.type == TokenType.COMMA) {
-            accept(TokenType.COMMA)
-
-            (currentToken as? IdentifierToken)?.let { token ->
-                if (parameters.any { it?.name == token.identifier }) {
-                    pushError(ErrorCode.DUPLICATE_IDENTIFIER)
-                    parameters.add(null)
-                } else {
-                    parameters.add(Parameter(token.identifier, null, transmissionMode))
-                    tempParameters.add(parameters.last())
-                }
-            }
-
-            accept(TokenType.IDENTIFIER)
-        }
-        accept(TokenType.COLON)
-        val parametersType = type_identifier()
-        tempParameters.forEach {
-            it?.type = parametersType
         }
     }
 
@@ -412,6 +263,12 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             identifier_list(followers + TokenType.COLON)
             accept(TokenType.COLON)
             val variableType = type(followers)
+
+            scopeManager.getBufferedVariables().forEach {
+                if (it is VariableIdentifier && variableType != null)
+                    CG.mainMethodWriter.visitLocalVariable(it.name, variableType.jvmName, null, CG.methodStart, CG.methodEnd, it.id)
+            }
+
             scopeManager.flushVariableBuffer(variableType)
             checkEnd(followers)
         }
@@ -482,12 +339,10 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * statement-sequence = statement { ` ;' statement } .
      */
     private fun statement_sequence(followers: Set<TokenType>) {
-        val starters = simpleStatementStarters + structuredStatementStarters + TokenType.END
+        val starters = simpleStatementStarters + structuredStatementStarters
         checkBeg(starters, followers)
 
-        if (currentToken.type == TokenType.END)
-            checkEnd(followers)
-        else if (currentToken.type in starters) {
+        if (currentToken.type in starters) {
             statement(followers + TokenType.SEMICOLON)
             while (currentToken.type == TokenType.SEMICOLON) {
                 accept(TokenType.SEMICOLON)
@@ -502,6 +357,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      */
     private fun statement(followers: Set<TokenType>) {
         unlabelled_statement(followers)
+        CG.flush()
     }
 
     /**
@@ -533,11 +389,36 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             accept(TokenType.IDENTIFIER)
             when (currentToken.type) {
                 TokenType.ASSIGN_OPERATOR -> assignment_statement(followers, identifierName)
-                else -> function_designator(followers, identifierName)
+                else -> if (identifierName.toLowerCase() == "writeln") writeln_statement(followers)
+                    else pushError(ErrorCode.UNEXPECTED_SYMBOL)
             }
 
             checkEnd(followers)
         }
+    }
+
+    private fun writeln_statement(followers: Set<TokenType>) {
+
+        CG.mainMethodWriter.visitFieldInsn(GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;")
+        // we push the value we want to print on the stack
+
+        if (currentToken.type == TokenType.LEFT_BRACKET) {
+            accept(TokenType.LEFT_BRACKET)
+            val expType = expression(followers + TokenType.RIGHT_BRACKET)
+            accept(TokenType.RIGHT_BRACKET)
+            CG.flush()
+            CG.flush()
+            CG.mainMethodWriter.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(${expType?.jvmName ?: "I"})V", false)
+        } else {
+            CG.mainMethodWriter.visitLdcInsn("")
+            CG.mainMethodWriter.visitMethodInsn(INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false)
+        }
+        // we call the method println of System.out to print the value. It will take its parameter from the stack
+        // note that we have to tell the JVM which variant of println to call. To do that we describe the signature of the method,
+        // depending on the type of the value we want to print. If we want to print an int we will produce the signature "(I)V",
+        // we will produce "(D)V" for a double
+
+        checkEnd(followers)
     }
 
     /**
@@ -559,6 +440,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             // accept(TokenType.IDENTIFIER)
             accept(TokenType.ASSIGN_OPERATOR)
             val expressionType = expression(followers)
+
+            if (identifier is VariableIdentifier && expressionType != null)
+                CG.assign(identifier, expressionType)
 
             val identifierType = identifier?.type
             if (identifierType != null && expressionType != null && !identifierType.isCompatibleTo(expressionType))
@@ -582,7 +466,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
             when (currentToken.type) {
                 TokenType.BEGIN -> compound_statement(followers)
                 TokenType.IF -> conditional_statement(followers)
-                TokenType.WHILE, TokenType.REPEAT, TokenType.FOR -> repetitive_statement(followers)
+                TokenType.WHILE -> repetitive_statement(followers)
                 else -> throw Exception("Unexpected error - here MUST be one of BEGIN, IF, WHILE, REPEAT, FOR")
             }
             checkEnd(followers)
@@ -603,14 +487,29 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         accept(TokenType.IF)
 
         val expressionType = expression(followers + TokenType.THEN)
+
+        CG.flush()
         if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
             pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
+
         accept(TokenType.THEN)
+
+        val alternativeLabel = Label()
+        val afterLabel = Label()
+        CG.mainMethodWriter.visitJumpInsn(IFEQ, alternativeLabel)
+
         statement(followers + TokenType.ELSE)
+
+        CG.mainMethodWriter.visitJumpInsn(GOTO, afterLabel)
+        CG.mainMethodWriter.visitLabel(alternativeLabel)
+
         if (currentToken.type == TokenType.ELSE) {
             accept(TokenType.ELSE)
             statement(followers)
         }
+
+        CG.mainMethodWriter.visitLabel(afterLabel)
+
         checkEnd(followers)
     }
 
@@ -626,6 +525,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in starters) {
             resultType = simple_expression(followers + relationalOperators)
             if (currentToken.type in relationalOperators) {
+                CG.addOperator(currentToken.type)
                 val operator = currentToken.type
                 relational_operator()
                 val expType = simple_expression(followers)
@@ -651,8 +551,17 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in simpleExpressionStarters) {
 
             if (currentToken.type in setOf(TokenType.PLUS, TokenType.MINUS)) {
+                val needNegotiation = currentToken.type == TokenType.MINUS
                 sign()
                 resultType = term(followers + addingOperators)
+                if (needNegotiation)
+                    CG.mainMethodWriter.visitInsn(
+                        when (resultType?.jvmName) {
+                            "I" -> INEG
+                            "F" -> FNEG
+                            else -> INEG
+                        }
+                    )
 
                 if (resultType != null && !resultType.isSignable())
                     pushError(ErrorCode.INTEGER_OR_REAL_EXPRESSION_EXPECTED)
@@ -664,6 +573,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                 resultType = term(followers + addingOperators)
 
             while (currentToken.type in addingOperators) {
+                CG.addOperator(currentToken.type)
                 val operator = currentToken.type
                 adding_operator()
                 val termType = term(followers + addingOperators)
@@ -714,6 +624,7 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
         if (currentToken.type in termStarters) {
             resultType = factor(followers + multiplyingOperators)
             while (currentToken.type in multiplyingOperators) {
+                CG.addOperator(currentToken.type)
                 val operator = currentToken.type
                 multiplying_operator()
                 val factorType = factor(followers + multiplyingOperators)
@@ -745,7 +656,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                     when (identifier) {
                         is VariableIdentifier -> resultType = variable()
                         is ConstantIdentifier -> {
-                            resultType = identifier.type; currentToken = getNextSymbol()
+                            resultType = identifier.type;
+                            CG.addOperand(ConstantOperand(if (identifier.name.toLowerCase() == "true") 1 else 0, ScopeManager.booleanType))
+                            currentToken = getNextSymbol()
                         }
                         is FunctionIdentifier -> {
                             accept(TokenType.IDENTIFIER)
@@ -769,12 +682,15 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                     TokenType.CHAR_CONSTANT
                 ) -> resultType = unsigned_constant()
                 currentToken.type == TokenType.LEFT_BRACKET -> {
+                    CG.addOperator(TokenType.LEFT_BRACKET)
                     accept(TokenType.LEFT_BRACKET)
                     resultType = expression(followers + TokenType.RIGHT_BRACKET)
                     accept(TokenType.RIGHT_BRACKET)
+                    CG.addOperator(TokenType.RIGHT_BRACKET)
                 }
                 currentToken.type == TokenType.NOT -> {
                     accept(TokenType.NOT)
+                    CG.addOperator(TokenType.NOT)
                     resultType = factor(followers)
                     if (resultType != null && !resultType.isLogical())
                         pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
@@ -876,7 +792,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * <variable> ::= <entire variable> | <component variable> | <referenced variable>
      */
     private fun variable(): Type? {
-        val identifier = scopeManager.findIdentifier(currentToken)
+        val identifier = scopeManager.findIdentifier(currentToken) as? VariableIdentifier
+        CG.addOperand(VariableType(identifier?.id ?: -1, identifier?.type ?: ScopeManager.integerType))
         accept(TokenType.IDENTIFIER)
         return identifier?.type
     }
@@ -886,6 +803,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      * <unsigned constant> ::= <unsigned number> | <string> | < constant identifier> < nil>
      */
     private fun unsigned_constant(): Type? {
+
+        val constant = (currentToken as? ConstantToken)?.value ?: 0
 
         val resultType: Type?
         when {
@@ -906,6 +825,9 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
                 resultType = null
             }
         }
+
+        CG.addOperand(ConstantOperand(constant, resultType ?: ScopeManager.integerType))
+
         return resultType
     }
 
@@ -957,11 +879,24 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
      */
     private fun while_statement(followers: Set<TokenType>) {
         accept(TokenType.WHILE)
+
+        val checkExprLabel = Label()
+        val afterLabel = Label()
+        CG.mainMethodWriter.visitLabel(checkExprLabel)
+
         val expressionType = expression(followers + TokenType.DO)
+        CG.flush()
         if (expressionType != null && !expressionType.isCompatibleTo(ScopeManager.booleanType))
             pushError(ErrorCode.BOOLEAN_EXPRESSION_EXPECTED)
         accept(TokenType.DO)
+
+        CG.mainMethodWriter.visitJumpInsn(IFEQ, afterLabel)
+
         statement(followers)
+
+        CG.mainMethodWriter.visitJumpInsn(GOTO, checkExprLabel)
+
+        CG.mainMethodWriter.visitLabel(afterLabel)
     }
 
     /**

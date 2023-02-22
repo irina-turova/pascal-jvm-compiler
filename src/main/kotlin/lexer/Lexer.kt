@@ -62,7 +62,7 @@ class Lexer(private val io: IOProvider, private val errors: ErrorList) {
                         if (number.toInt() > maxInt)
                             errors.pushError(Error(tokenPosition, ErrorCode.CONSTANT_OUT_OF_RANGE))
                         TokenType.INT_CONSTANT
-                    }, tokenPosition, number)
+                    }, tokenPosition, number.toIntOrNull() ?: number.toFloat())
             }
             '\'' -> {
                 io.takeNextChar()

@@ -1,13 +1,88 @@
-program p1;
+program p1; // Тернарный поиск корня квадратного уравнения
+type
+myinteger = integer;
+myint = integer;
+char = myint;
+var
+    itersCount: myint;
+    a, b, c, x, L, R, mid1, mid2, eps: real;
+    bool, bool2: boolean;
+begin
+
+    bool := true OR false;
+    writeln(bool);
+    bool2 := NOT bool;
+    writeln(bool2);
+
+    if bool OR false then writeln(77);
+
+    a := -1;
+    b := -10;
+    c := -25;
+
+    L := -100;
+    R := 100;
+    eps := 0.001;
+
+    itersCount := 0;
+
+    while NOT (R - L <= eps) AND (itersCount < 100) do begin
+
+        writeln(L);
+        writeln(R);
+        writeln;
+
+        mid1 := L + (R - L) / 3.0;
+        mid2 := L + 2.0 * (R - L) / 3.0;
+
+        if a >= 0.0 then
+            if (a * mid2 * mid2 + b * mid2 + c) >= (a * mid1 * mid1 + b * mid1 + c) then
+                R := mid2
+            else
+                L := mid1
+        else
+            if (a * mid2 * mid2 + b * mid2 + c) < (a * mid1 * mid1 + b * mid1 + c) then
+                R := mid2
+            else
+                L := mid1;
+
+        itersCount := itersCount + 1
+    end;
+
+    writeln(itersCount);
+    writeln;
+    writeln((L + R) / 2.0)
+
+end.
+
+{program p1; // Find time difference in minutes
+var
+    hours1, minutes1, hours2, minutes2:integer;
+    allMinutes1, allMinutes2, result: integer;
+begin
+    hours1:=15;
+    minutes1:=25;
+
+    hours2:=15;
+    minutes2:=21;
+
+    allMinutes1 := hours1 * 60 + minutes1;
+    allMinutes2 := hours2 * 60 + minutes2;
+    result := allMinutes2 - allMinutes1
+
+    // writeln(result)
+end.}
+
+{program p1;
 var
     a:integer;
 begin
 b:=1;
 b:=2;
 a:='c';
-a:='b'
+a:='b';
 end.
-
+}
 
 
 
@@ -67,7 +142,7 @@ begin
 
 end
 }
-   program example(a,c,v);
+{   program example(a,c,v);
    const min1=555;
          max1=666;
    type day=(Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday);
@@ -181,3 +256,5 @@ end
     Aaa:=(3*3-x*4/4)-3*(1+1)*(asd^[5,, gg*ddd[y^, gg=hh*ooo]])-(1);
     dfg+asdf;
     end.
+
+    }
