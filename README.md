@@ -1,4 +1,4 @@
-# Pascal JVM compiler
+# Pascal JVM compiler (2019)
 
 The project is implemented on educational purpose. Its main goal is getting experience in compiler implementation.
 
