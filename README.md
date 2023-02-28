@@ -1,6 +1,6 @@
 # Pascal JVM compiler (2019)
 
-The project is implemented on educational purpose. Its main goal is getting experience in compiler implementation.
+The project is implemented for educational purposes. Its main goal is to get experience in a compiler implementation.
 
 The compiler implements an analysis of a subset of Pascal language grammar. A Pascal program is translated to Java byte code. 
 
@@ -19,21 +19,21 @@ The compiler supports
 * Functions declaration and invocation
 
 ## Example
-In this README the work of the compiler is illustrated by the example of a Pascal program that implements a ternary search algorithm for square equation solution.
-In each section one of the modules of the compiler is discussed and illustrated by a screenshot of the program parts containing the messages provided by the discussed module (other modules messages are blured). You can see a full program listing below. 
+In this README, the compiler’s work is illustrated by the example of a Pascal program that implements a ternary search algorithm for a square equation solution.
+In each section, one of the modules of the compiler is discussed and illustrated by a screenshot of the program parts containing the messages provided by the discussed module (other modules’ messages are blurred). You can see a complete program listing below. 
 
 ![example_full.png](readme/example_full.png)
 
 ## Lexical analysis
-Lexer is a compiler module which transforms a program text into a sequence of language symbols. It also reveals lexical errors:
-* Constant range violation (i.e. for integer value the range is -32768..32767)
+Lexer is a compiler module that transforms a program text into a sequence of language symbols. It also reveals lexical errors:
+* Constant range violation (i.e., for an integer value, the range is -32768..32767)
 * Detection of the unsupported characters (i.e. `%`, `!`, `$`)
 
 ![example_lexer.png](readme/example_lexer.png)
 
 ## Syntax analysis
 Syntax Analyzer checks the sequence of symbols for language syntax rules and generates syntax errors.
-For example, having a set of high-level BNF syntax rules and an if expression `a < 0,0`, Syntax Analyzer detects unexpected `,` and generates en error message.
+For example, having a set of high-level BNF syntax rules and an if expression `a < 0,0`, Syntax Analyzer detects unexpected `,` and generates an error message.
 
 `<if statement> ::= if <expression> then <statement> | if <expression> then <statement> else <statement>` </br>
 `<expression> ::= <simple expression> | <simple expression> <relational operator> <simple expression>`</br>
@@ -44,13 +44,13 @@ For example, having a set of high-level BNF syntax rules and an if expression `a
 `<unsigned constant> ::= <unsigned number> | <string> | < constant identifier> < nil>` </br>
 `<relational operator> ::= = | <> | < | <= | >= | > | in` </br>
 
-Also, the Syntax Analyzer implements a basic error neutralization technics. Neutralization is a process of recovery after an error detection. For example, we can skip some sequence of symbols until we meet an appropriate symbol like in the expression above we skip `,`, `0` until we meet `then` that is a legal part of the if statement.
+Also, the Syntax Analyzer implements basic error neutralization technics. Neutralization is a process of recovery after error detection. For example, we can skip some sequence of symbols until we meet an appropriate symbol like in the expression above we skip `,` and `0` until we meet `then` which is a legal part of the if statement.
 
 ![example_syntax.png](readme/example_syntax.png)
 
 ## Semantic analysis
 
-Semantic analyzer checks the program for semantic errors. Supported types of errors:
+Semantic Analyzer checks the program for semantic errors. Supported types of errors:
 * Occurrence of an undeclared identifier (type, variable, function) 
 * Multiple identifier declaration
 * Incompatible operands types of an operator
@@ -60,9 +60,9 @@ Semantic analyzer checks the program for semantic errors. Supported types of err
 
 ## Code generation
 
-The module generates Java bytecode for provided Pascal program with the use of the library [ASM](https://asm.ow2.io). The compiler uses a core API of the library. While parsing a program, the Code Generator builds a sequence of Java bytecode instructions that operate on the list of local variables and operand stack.
+The module generates Java bytecode for provided Pascal program using the library [ASM](https://asm.ow2.io). The compiler uses a core API of the library. While parsing a program, the Code Generator builds a sequence of Java bytecode instructions that operate on the list of local variables and operand stack.
 
-An example of bytecode for a smaller program.
+An example of bytecode for a more minor program.
 
 ![bytecode_example.png](readme/bytecode_example.png)
 
@@ -70,7 +70,6 @@ An example of bytecode for a smaller program.
 // class version 52.0 (52)
 // access flags 0x1
 public class PascalProgram {
-
 
   // access flags 0x9
   public static main([Ljava/lang/String;)V
@@ -112,3 +111,4 @@ public class PascalProgram {
     MAXLOCALS = 0
 }
 ```
+
