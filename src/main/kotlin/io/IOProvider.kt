@@ -65,7 +65,7 @@ class IOProvider(fileName: String, private val errors: ErrorList) {
             val errorNumberString = (errorNumber++).toString()
             val errorNumPadEnd = (columnWidth - errorNumberString.length) / 2
             (errorNumberString.padStart(columnWidth - errorNumPadEnd, '*').padEnd(columnWidth, '*') +
-                    " ".repeat(error.textPosition.charNumber - 1) + "^ ошибка: ${error.errorCode.errorText()}").also {
+                    " ".repeat(error.textPosition.charNumber) + "^ error: ${error.errorCode.errorText()}").also {
                 println(it)
                 writer.write(it)
                 writer.newLine()

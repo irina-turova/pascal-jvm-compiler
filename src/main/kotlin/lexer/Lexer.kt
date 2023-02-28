@@ -192,7 +192,7 @@ class Lexer(private val io: IOProvider, private val errors: ErrorList) {
             }
             else -> {
                 io.takeNextChar()
-                errors.pushError(Error(tokenPosition, ErrorCode.NO_NAME_ERROR))
+                //errors.pushError(Error(tokenPosition, ErrorCode.NO_NAME_ERROR))
                 Token(TokenType.NOTHING, tokenPosition)
             }
         }

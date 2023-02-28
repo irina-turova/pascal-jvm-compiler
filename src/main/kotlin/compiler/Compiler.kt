@@ -1,20 +1,16 @@
 package compiler
 
+import common.ErrorList
 import io.IOProvider
 import lexer.Lexer
 import parser.Parser
-import common.ErrorList
 import semantic.ScopeManager
+import java.io.File
 import java.io.FileOutputStream
 import java.util.jar.Attributes
-import java.util.jar.JarOutputStream
-import java.util.jar.Attributes.Name.MAIN_CLASS
-import java.util.jar.Attributes.Name.MANIFEST_VERSION
-import java.util.jar.Manifest
 import java.util.jar.JarEntry
-import java.io.IOException
-
-
+import java.util.jar.JarOutputStream
+import java.util.jar.Manifest
 
 
 object Compiler {
@@ -25,6 +21,14 @@ object Compiler {
             println("Specify program file name as the first parameter.")
             return
         }
+
+        File(args[0]).also {
+            if (!it.exists()) {
+                println("File with specified name does not exist")
+                return
+            }
+        }
+
         val errorList = ErrorList()
         val io = IOProvider(args[0], errorList)
         val lexer = Lexer(io, errorList)

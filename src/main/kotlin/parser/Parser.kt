@@ -33,10 +33,10 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     }
 
     private fun skipTo(vararg tokens: Set<TokenType>) {
-        print("Skipping: ")
+//        print("Skipping: ")
         val united = tokens.fold(setOf(TokenType.THIS_IS_THE_END)) { a, b -> a union b}
         while (currentToken.type !in united) {
-            println("\t$currentToken")
+//            println("\t$currentToken")
             currentToken = getNextSymbol()
         }
     }
@@ -44,8 +44,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     private fun checkBeg(starters: Set<TokenType>, followers: Set<TokenType>) {
         if (currentToken.type !in starters) {
             pushError(ErrorCode.UNEXPECTED_SYMBOL)
-            println("Now we will skip because of:")
-            Exception().printStackTrace(System.out)
+//            println("Now we will skip because of ${currentToken} (expected one of: ${followers}):")
+//            Exception().printStackTrace(System.out)
             skipTo(starters, followers)
         }
     }
@@ -53,8 +53,8 @@ class Parser(private val lexer: Lexer, private val errors: ErrorList, private va
     private fun checkEnd(followers: Set<TokenType>, error: ErrorCode? = null) {
         if (currentToken.type !in followers) {
             pushError(ErrorCode.UNEXPECTED_SYMBOL)
-            println("Now we will skip because of:")
-            Exception().printStackTrace(System.out)
+//            println("Now we will skip because of (expected one of: ${followers}):")
+//            Exception().printStackTrace(System.out)
             skipTo(followers)
         }
     }
